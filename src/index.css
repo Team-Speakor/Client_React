@@ -1,0 +1,534 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Premium ChatGPT/Apple-inspired design system */
+
+@layer base {
+  :root {
+    --background: 255 255 255;
+    --foreground: 28 28 30;
+
+    --card: 251 251 251;
+    --card-foreground: 28 28 30;
+
+    --popover: 255 255 255;
+    --popover-foreground: 28 28 30;
+
+    --primary: 0 122 255;
+    --primary-foreground: 255 255 255;
+
+    --secondary: 242 242 247;
+    --secondary-foreground: 28 28 30;
+
+    --muted: 242 242 247;
+    --muted-foreground: 142 142 147;
+
+    --accent: 0 122 255;
+    --accent-foreground: 255 255 255;
+
+    --destructive: 255 59 48;
+    --destructive-foreground: 255 255 255;
+
+    --success: 52 199 89;
+    --success-foreground: 255 255 255;
+
+    --warning: 255 149 0;
+    --warning-foreground: 255 255 255;
+
+    --border: 229 229 234;
+    --input: 209 209 214;
+    --ring: 0 122 255;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 255 255 255;
+    --sidebar-foreground: 28 28 30;
+    --sidebar-primary: 0 122 255;
+    --sidebar-primary-foreground: 255 255 255;
+    --sidebar-accent: 242 242 247;
+    --sidebar-accent-foreground: 28 28 30;
+    --sidebar-border: 229 229 234;
+    --sidebar-ring: 0 122 255;
+  }
+
+  .dark {
+    --background: 0 0 0;
+    --foreground: 255 255 255;
+
+    --card: 28 28 30;
+    --card-foreground: 255 255 255;
+
+    --popover: 28 28 30;
+    --popover-foreground: 255 255 255;
+
+    --primary: 10 132 255;
+    --primary-foreground: 255 255 255;
+
+    --secondary: 44 44 46;
+    --secondary-foreground: 255 255 255;
+
+    --muted: 44 44 46;
+    --muted-foreground: 142 142 147;
+
+    --accent: 44 44 46;
+    --accent-foreground: 255 255 255;
+
+    --destructive: 255 69 58;
+    --destructive-foreground: 255 255 255;
+
+    --success: 48 209 88;
+    --success-foreground: 255 255 255;
+
+    --warning: 255 159 10;
+    --warning-foreground: 255 255 255;
+
+    --border: 58 58 60;
+    --input: 58 58 60;
+    --ring: 10 132 255;
+    
+    --sidebar-background: 28 28 30;
+    --sidebar-foreground: 255 255 255;
+    --sidebar-primary: 10 132 255;
+    --sidebar-primary-foreground: 255 255 255;
+    --sidebar-accent: 44 44 46;
+    --sidebar-accent-foreground: 255 255 255;
+    --sidebar-border: 58 58 60;
+    --sidebar-ring: 10 132 255;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-white text-foreground font-system antialiased;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif !important;
+    background-color: #FFFFFF !important;
+  }
+
+  html, body, #root {
+    background-color: #FFFFFF !important;
+  }
+}
+
+/* Premium ChatGPT/Apple component styling */
+@layer components {
+  /* Core container styling */
+  .page-container {
+    background-color: #FFFFFF !important;
+    min-height: 100vh !important;
+    max-width: 800px !important;
+    margin: 0 auto !important;
+    padding: 24px !important;
+  }
+
+  .main-container, .content-container {
+    background-color: #FFFFFF !important;
+  }
+
+  /* Premium card design */
+  .premium-card {
+    background: #FBFBFB !important;
+    border: 1px solid #E5E5EA !important;
+    border-radius: 12px !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
+    transition: all 0.15s ease !important;
+  }
+
+  /* ChatGPT-style input fields */
+  .input-field {
+    background: #FFFFFF !important;
+    border: 1.5px solid #D1D1D6 !important;
+    color: #1C1C1E !important;
+    border-radius: 8px !important;
+    padding: 12px 16px !important;
+    font-size: 16px !important;
+    font-weight: 400 !important;
+    transition: all 0.15s ease !important;
+    min-height: 44px;
+  }
+
+  .input-field:focus {
+    border-color: #007AFF !important;
+    box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.08) !important;
+    outline: none !important;
+  }
+
+  /* Apple iOS button system */
+  .btn-primary {
+    background: #007AFF !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: 10px !important;
+    padding: 12px 24px !important;
+    font-weight: 600 !important;
+    font-size: 16px !important;
+    transition: all 0.2s ease !important;
+    min-height: 44px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+  }
+
+  .btn-primary:hover {
+    background: #0056D6 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 8px rgba(0, 122, 255, 0.2) !important;
+  }
+
+  .btn-secondary {
+    background: #F2F2F7 !important;
+    color: #1C1C1E !important;
+    border: 1px solid #E5E5EA !important;
+    border-radius: 10px !important;
+    padding: 12px 24px !important;
+    font-weight: 500 !important;
+    transition: all 0.15s ease !important;
+    min-height: 44px;
+  }
+
+  .btn-secondary:hover {
+    background: #E5E5EA !important;
+    transform: translateY(-1px) !important;
+  }
+
+  /* Speaker card improvements */
+  .speaker-card {
+    background: #FFFFFF !important;
+    border: 1.5px solid #E5E5EA !important;
+    border-radius: 12px !important;
+    padding: 20px !important;
+    transition: all 0.2s ease !important;
+    cursor: pointer;
+  }
+
+  .speaker-card:hover {
+    border-color: #007AFF !important;
+    box-shadow: 0 4px 12px rgba(0, 122, 255, 0.1) !important;
+    transform: translateY(-2px) !important;
+  }
+
+  .speaker-card.selected {
+    border-color: #007AFF !important;
+    background: #F0F8FF !important;
+    box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.3) !important;
+  }
+
+  /* Waveform visualization */
+  .waveform-bar {
+    background: #D1D1D6 !important;
+    border-radius: 2px;
+    width: 2px;
+    transition: all 0.1s ease !important;
+  }
+
+  .waveform-bar.active {
+    background: #007AFF !important;
+    animation: pulse 0.5s ease-out !important;
+  }
+
+  /* Stepper input styling */
+  .stepper-input {
+    background: #F2F2F7 !important;
+    border-radius: 8px !important;
+    padding: 8px !important;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+  }
+
+  .stepper-button {
+    background: #FFFFFF !important;
+    border: 1px solid #D1D1D6 !important;
+    color: #007AFF !important;
+    border-radius: 6px !important;
+    width: 32px !important;
+    height: 32px !important;
+    font-weight: 600 !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease !important;
+  }
+
+  .stepper-button:hover {
+    background: #F8F9FA !important;
+    color: #0056D6 !important;
+  }
+
+  .stepper-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* Error highlighting */
+  .error-word {
+    color: #FF3B30 !important;
+    text-decoration: underline !important;
+    text-decoration-color: #FF3B30 !important;
+    text-underline-offset: 2px !important;
+    cursor: pointer;
+    padding: 1px 2px;
+    border-radius: 4px;
+    transition: background-color 0.2s ease !important;
+  }
+
+  .error-word:hover {
+    background-color: rgba(255, 59, 48, 0.1) !important;
+  }
+
+  /* Segment highlight */
+  .segment-highlight {
+    background-color: rgba(255, 59, 48, 0.05) !important;
+    border-left: 4px solid #FF3B30 !important;
+    border-top-right-radius: 8px !important;
+    border-bottom-right-radius: 8px !important;
+  }
+
+  /* Premium recording interface */
+  .recording-button {
+    background: #007AFF !important;
+    border: none !important;
+    border-radius: 50% !important;
+    width: 80px !important;
+    height: 80px !important;
+    box-shadow: 0 4px 16px rgba(0, 122, 255, 0.3) !important;
+    transition: all 0.2s ease !important;
+  }
+
+  .recording-button.active {
+    background: #FF3B30 !important;
+    animation: pulse 2s infinite !important;
+  }
+
+  /* Timer display */
+  .timer-display {
+    color: #1C1C1E !important;
+    font-weight: 600 !important;
+    font-size: 24px !important;
+    font-variant-numeric: tabular-nums !important;
+    background: #F2F2F7 !important;
+    padding: 8px 16px !important;
+    border-radius: 8px !important;
+  }
+
+  /* Stats cards */
+  .stat-card {
+    background: #FFFFFF !important;
+    border: 1px solid #E5E5EA !important;
+    border-radius: 12px !important;
+    padding: 16px !important;
+    text-align: center !important;
+    transition: all 0.15s ease !important;
+  }
+
+  .stat-card:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
+  }
+
+  /* Upload section */
+  .upload-section {
+    background: #F8F9FA !important;
+    border: 2px dashed #D1D1D6 !important;
+    border-radius: 12px !important;
+    padding: 32px !important;
+    transition: all 0.2s ease !important;
+    cursor: pointer;
+  }
+
+  .upload-section:hover {
+    border-color: #007AFF !important;
+    background: #F0F8FF !important;
+  }
+
+  /* Enhanced feedback buttons */
+  .view-feedback-button, .hide-feedback-button {
+    background: #007AFF !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 12px 20px !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    min-height: 44px !important;
+    min-width: 140px !important;
+    white-space: nowrap !important;
+    transition: all 0.15s ease !important;
+  }
+
+  .view-feedback-button:hover, .hide-feedback-button:hover {
+    background: #0056D6 !important;
+    transform: translateY(-1px) !important;
+  }
+}
+
+/* Typography scale */
+@layer utilities {
+  /* Premium shadows */
+  .shadow-premium {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  }
+
+  .shadow-premium-lg {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  }
+
+  /* Typography hierarchy */
+  .text-display {
+    @apply text-4xl font-bold leading-tight tracking-tight;
+    color: #1C1C1E !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.5px !important;
+  }
+  
+  .text-title {
+    @apply text-2xl font-semibold leading-tight tracking-tight;
+    color: #1C1C1E !important;
+    font-weight: 600 !important;
+  }
+  
+  .text-subtitle {
+    @apply text-xl font-medium leading-normal;
+    color: #1C1C1E !important;
+    font-weight: 600 !important;
+  }
+  
+  .text-body {
+    @apply text-base leading-relaxed;
+    color: #3A3A3C !important;
+    font-weight: 400 !important;
+  }
+  
+  .text-caption {
+    @apply text-sm leading-normal;
+    color: #8E8E93 !important;
+    font-weight: 500 !important;
+  }
+
+  /* Smooth transitions */
+  .transition-premium {
+    @apply transition-all duration-200 ease-out;
+  }
+
+  /* Touch targets */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Spacing system */
+  .section-spacing {
+    margin-bottom: 32px !important;
+  }
+
+  .card-spacing {
+    margin-bottom: 16px !important;
+  }
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .page-container {
+    padding: 16px !important;
+  }
+
+  .text-display {
+    @apply text-3xl;
+  }
+  
+  .text-title {
+    @apply text-xl;
+  }
+
+  .view-feedback-button, .hide-feedback-button {
+    width: 100% !important;
+    margin-top: 8px !important;
+    min-width: 120px !important;
+    font-size: 14px !important;
+  }
+
+  .speaker-card {
+    padding: 16px !important;
+  }
+
+  .upload-section {
+    padding: 24px !important;
+  }
+}
+
+/* Optimized animations */
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 20px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.animate-slide-in-up {
+  animation: slideInUp 0.4s ease-out;
+  will-change: transform, opacity;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+  will-change: opacity;
+}
+
+/* Modal animations - GPU accelerated */
+.modal-enter {
+  transform: translate3d(0, 20px, 0) !important;
+  opacity: 0 !important;
+  transition: transform 0.2s ease-out, opacity 0.2s ease-out !important;
+  will-change: transform, opacity !important;
+}
+
+.modal-enter-active {
+  transform: translate3d(0, 0, 0) !important;
+  opacity: 1 !important;
+}
+
+/* Focus & interaction states */
+button:focus, input:focus, .clickable:focus {
+  outline: 2px solid #007AFF !important;
+  outline-offset: 2px !important;
+}
+
+/* High contrast support */
+@media (prefers-contrast: high) {
+  .premium-card, .speaker-card {
+    border-width: 2px !important;
+  }
+}
+
+/* Accessibility - Respect motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

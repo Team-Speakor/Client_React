@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Play, User } from "lucide-react";
@@ -86,7 +85,7 @@ const SpeakerSelection = ({ audioData, userName, participantCount, onSpeakerSele
                   <div className={`
                     w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-200
                     ${selectedSpeaker === speaker.id 
-                      ? 'border-green-600 bg-green-600' 
+                      ? 'border-blue-600 bg-blue-600' 
                       : 'border-gray-400'
                     }
                   `}>

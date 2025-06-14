@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Play, Pause, RotateCcw, Eye, EyeOff, ChevronRight } from "lucide-react";
@@ -89,9 +88,9 @@ const AnalysisResults = ({ data, userName, selectedSpeaker, onStartOver }: Analy
     }
     
     const otherStyles = {
-      'speaker1': 'bg-gray-50 border-l-gray-400',
-      'speaker2': 'bg-gray-50 border-l-gray-400',
-      'speaker3': 'bg-gray-50 border-l-gray-400',
+      'speaker1': 'bg-green-50 border-l-green-500',
+      'speaker2': 'bg-purple-50 border-l-purple-500',
+      'speaker3': 'bg-orange-50 border-l-orange-500',
     };
     
     return otherStyles[speaker as keyof typeof otherStyles] || 'bg-gray-50 border-l-gray-400';
@@ -99,16 +98,16 @@ const AnalysisResults = ({ data, userName, selectedSpeaker, onStartOver }: Analy
 
   const getSpeakerBadgeStyle = (speaker: string) => {
     if (speaker === 'user') {
-      return 'bg-green-600 text-white';
+      return 'bg-blue-600 text-white font-semibold';
     }
     
     const badgeStyles = {
-      'speaker1': 'bg-gray-100 text-gray-700',
-      'speaker2': 'bg-gray-100 text-gray-700', 
-      'speaker3': 'bg-gray-100 text-gray-700',
+      'speaker1': 'bg-green-600 text-white font-medium',
+      'speaker2': 'bg-purple-600 text-white font-medium', 
+      'speaker3': 'bg-orange-600 text-white font-medium',
     };
     
-    return badgeStyles[speaker as keyof typeof badgeStyles] || 'bg-gray-100 text-gray-700';
+    return badgeStyles[speaker as keyof typeof badgeStyles] || 'bg-gray-600 text-white font-medium';
   };
 
   const handleSegmentClick = (item: TranscriptItem) => {
@@ -180,65 +179,66 @@ const AnalysisResults = ({ data, userName, selectedSpeaker, onStartOver }: Analy
       <div className="space-y-8 animate-slide-in-up">
         {/* Header */}
         <div className="premium-card p-6 md:p-8">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
-            <div>
+          <div className="flex flex-col gap-6 mb-8">
+            <div className="text-center md:text-left">
               <h2 className="text-title text-gray-900 mb-2">
                 Analysis Results
               </h2>
               <p className="text-body text-gray-700">
-                Pronunciation analysis for {userName}
+                Pronunciation analysis for <span className="font-semibold text-blue-600">{userName}</span>
               </p>
             </div>
             
-            {/* Fixed button container */}
-            <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:justify-end md:items-center max-w-full">
-              <Button
-                onClick={handlePlayRecording}
-                variant="outline"
-                size="sm"
-                className="rounded-lg touch-target btn-secondary text-gray-700 border-gray-200 hover:bg-gray-50"
-              >
-                {isPlaying ? (
-                  <>
-                    <Pause className="w-4 h-4 mr-2" />
-                    Stop Playing
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-4 h-4 mr-2" />
-                    Play Recording
-                  </>
-                )}
-              </Button>
-              
-              <Button
-                onClick={() => setShowAllFeedback(!showAllFeedback)}
-                variant="outline"
-                size="sm"
-                className="rounded-lg touch-target btn-secondary text-gray-700 border-gray-200 hover:bg-gray-50"
-              >
-                {showAllFeedback ? (
-                  <>
-                    <EyeOff className="w-4 h-4 mr-2" />
-                    Hide Feedback
-                  </>
-                ) : (
-                  <>
-                    <Eye className="w-4 h-4 mr-2" />
-                    View All Feedback
-                  </>
-                )}
-              </Button>
-              
-              <Button
-                onClick={onStartOver}
-                variant="outline"
-                size="sm"
-                className="rounded-lg touch-target btn-secondary text-gray-700 border-gray-200 hover:bg-gray-50"
-              >
-                <RotateCcw className="w-4 h-4 mr-2" />
-                Start Over
-              </Button>
+            <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <Button
+                  onClick={handlePlayRecording}
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-center rounded-lg touch-target btn-secondary text-gray-700 border-gray-200 hover:bg-gray-50 h-11"
+                >
+                  {isPlaying ? (
+                    <>
+                      <Pause className="w-4 h-4 mr-2" />
+                      <span className="min-w-[80px]">Stop</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-4 h-4 mr-2" />
+                      <span className="min-w-[80px]">Play Recording</span>
+                    </>
+                  )}
+                </Button>
+                
+                <Button
+                  onClick={() => setShowAllFeedback(!showAllFeedback)}
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-center rounded-lg touch-target btn-secondary text-gray-700 border-gray-200 hover:bg-gray-50 h-11"
+                >
+                  {showAllFeedback ? (
+                    <>
+                      <EyeOff className="w-4 h-4 mr-2" />
+                      <span className="min-w-[80px]">Hide Feedback</span>
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="w-4 h-4 mr-2" />
+                      <span className="min-w-[80px]">View Feedback</span>
+                    </>
+                  )}
+                </Button>
+                
+                <Button
+                  onClick={onStartOver}
+                  variant="outline"
+                  size="sm"
+                  className="w-full sm:col-span-2 lg:col-span-1 justify-center rounded-lg touch-target btn-secondary text-gray-700 border-gray-200 hover:bg-gray-50 h-11"
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  <span className="min-w-[80px]">Start Over</span>
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -285,22 +285,22 @@ const AnalysisResults = ({ data, userName, selectedSpeaker, onStartOver }: Analy
             >
               <div className="flex items-start space-x-4">
                 <div className={`
-                  px-3 py-2 rounded-full text-caption font-medium min-w-fit
+                  px-4 py-2 rounded-full text-sm font-medium min-w-fit
                   ${getSpeakerBadgeStyle(item.speaker)}
                 `}>
                   {getSpeakerLabel(item.speaker)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-body leading-relaxed">
+                  <p className="text-body leading-relaxed text-gray-900">
                     {renderTextWithErrors(item)}
                   </p>
                   {item.errors && item.errors.length > 0 && (
                     <div className="flex items-center justify-between mt-4">
-                      <p className="text-caption text-muted-foreground flex items-center">
+                      <p className="text-sm text-gray-700 flex items-center font-medium">
                         <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
                         {item.errors.length} pronunciation {item.errors.length === 1 ? 'error' : 'errors'} detected
                       </p>
-                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                      <ChevronRight className="w-4 h-4 text-gray-500" />
                     </div>
                   )}
                 </div>
@@ -312,7 +312,7 @@ const AnalysisResults = ({ data, userName, selectedSpeaker, onStartOver }: Analy
         {/* All Feedback Summary Panel */}
         {showAllFeedback && (
           <div className="premium-card p-6">
-            <h3 className="text-subtitle font-semibold text-foreground mb-6">
+            <h3 className="text-subtitle font-semibold text-gray-900 mb-6">
               Complete Feedback Summary
             </h3>
             <div className="space-y-4">
@@ -321,26 +321,30 @@ const AnalysisResults = ({ data, userName, selectedSpeaker, onStartOver }: Analy
                 .map((item, segmentIndex) => (
                   <div
                     key={segmentIndex}
-                    className="premium-card p-4 cursor-pointer hover:shadow-premium transition-premium"
+                    className="premium-card p-4 cursor-pointer hover:shadow-premium transition-premium border border-gray-200"
                     onClick={() => setSelectedSegment(item)}
                   >
                     <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-body font-medium text-foreground mb-2">
+                      <div className="flex-1">
+                        <p className="text-body font-semibold text-gray-900 mb-2">
                           Segment {segmentIndex + 1}: "{item.text.substring(0, 50)}..."
                         </p>
                         <div className="flex flex-wrap gap-2">
                           {item.errors?.map((error, errorIndex) => (
                             <span
                               key={errorIndex}
-                              className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-caption font-medium"
+                              className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-medium"
                             >
                               {error.word}
                             </span>
                           ))}
                         </div>
                       </div>
-                      <Button variant="outline" size="sm" className="rounded-lg btn-secondary">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="rounded-lg btn-secondary ml-4 flex-shrink-0 h-10 px-4"
+                      >
                         View Details
                       </Button>
                     </div>

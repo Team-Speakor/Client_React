@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Mic, Square, ArrowLeft } from "lucide-react";
 
@@ -13,54 +13,101 @@ const RecordingInterface = ({ onComplete, onBack, userName }: RecordingInterface
   const [timeLeft, setTimeLeft] = useState(180);
   const [audioLevel, setAudioLevel] = useState(0);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    let speakingTimeout: NodeJS.Timeout;
+    // On component unmount, close the single AudioContext
+    return () => {
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close();
+      }
+    };
+  }, []);
+
+  const updateAudioLevel = useCallback(() => {
+    if (!analyserRef.current) return;
+
+    const analyser = analyserRef.current;
+    const timeData = new Uint8Array(analyser.fftSize);
+    analyser.getByteTimeDomainData(timeData);
+
+    let sumSquares = 0.0;
+    for (const amplitude of timeData) {
+      const normalizedAmplitude = amplitude / 128.0 - 1.0;
+      sumSquares += normalizedAmplitude * normalizedAmplitude;
+    }
+    const rms = Math.sqrt(sumSquares / timeData.length);
+    const normalizedLevel = Math.min(rms * 150, 100);
     
-    if (isRecording && timeLeft > 0) {
-      interval = setInterval(() => {
-        setTimeLeft(prev => prev - 1);
-        
-        // More realistic speech simulation
-        const shouldSpeak = Math.random() < 0.25;
-        if (shouldSpeak) {
-          setIsSpeaking(true);
-          setAudioLevel(40 + Math.random() * 60);
-          
-          speakingTimeout = setTimeout(() => {
-            setIsSpeaking(false);
-            setAudioLevel(5 + Math.random() * 10);
-          }, 800 + Math.random() * 1500);
-        } else {
-          setAudioLevel(5 + Math.random() * 15);
-        }
-      }, 1000);
-    } else if (timeLeft === 0) {
-      handleStopRecording();
+    setAudioLevel(normalizedLevel);
+    setIsSpeaking(normalizedLevel > 2);
+  }, []);
+
+  useEffect(() => {
+    if (isRecording) {
+      const loop = () => {
+        updateAudioLevel();
+        animationFrameRef.current = requestAnimationFrame(loop);
+      };
+      animationFrameRef.current = requestAnimationFrame(loop);
+    }
+    
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      setAudioLevel(0);
+      setIsSpeaking(false);
+    };
+  }, [isRecording, updateAudioLevel]);
+
+  const setupAudioAnalysis = async (stream: MediaStream) => {
+    if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    const audioContext = audioContextRef.current;
+
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume();
     }
 
-    return () => {
-      clearInterval(interval);
-      clearTimeout(speakingTimeout);
-    };
-  }, [isRecording, timeLeft]);
+    if (sourceRef.current) {
+      sourceRef.current.disconnect();
+    }
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    const analyser = audioContext.createAnalyser();
+    analyser.fftSize = 1024;
+    analyser.smoothingTimeConstant = 0.3;
+
+    const source = audioContext.createMediaStreamSource(stream);
+    source.connect(analyser);
+
+    analyserRef.current = analyser;
+    sourceRef.current = source;
   };
 
-  const handleStartRecording = () => {
-    setIsRecording(true);
-    console.log("Recording started for:", userName);
-  };
-
-  const handleStopRecording = () => {
+  const handleStopRecording = useCallback(() => {
     setIsRecording(false);
-    setIsSpeaking(false);
-    setAudioLevel(0);
+
+    // Stop MediaRecorder
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+    }
+
+    if (audioStream) {
+      audioStream.getTracks().forEach(track => track.stop());
+    }
+
+    if (sourceRef.current) {
+      sourceRef.current.disconnect();
+      sourceRef.current = null;
+    }
+    analyserRef.current = null;
     
     // Mock Korean conversation data
     const sampleData = {
@@ -99,24 +146,77 @@ const RecordingInterface = ({ onComplete, onBack, userName }: RecordingInterface
     };
     
     onComplete(sampleData);
+  }, [mediaRecorder, audioStream, onComplete, userName]);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isRecording && timeLeft > 0) {
+      interval = setInterval(() => {
+        setTimeLeft(prev => prev - 1);
+      }, 1000);
+    } else if (timeLeft === 0 && isRecording) {
+      handleStopRecording();
+    }
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [isRecording, timeLeft, handleStopRecording]);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleStartRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        }
+      });
+      setAudioStream(stream);
+
+      await setupAudioAnalysis(stream);
+      
+      const recorder = new MediaRecorder(stream);
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          // Chunks are handled by onstop
+        }
+      };
+      recorder.onstop = () => {
+        // onComplete is now called from handleStopRecording to ensure cleanup
+      };
+
+      setMediaRecorder(recorder);
+      recorder.start();
+      setIsRecording(true);
+    } catch (error) {
+      console.error('Failed to start recording:', error);
+      alert('마이크 접근 권한이 필요합니다. 브라우저 설정을 확인해주세요.');
+    }
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-slide-in-up">
       {/* Header */}
       <div className="flex items-center justify-between">
         <Button 
           onClick={onBack}
           variant="ghost"
           size="sm"
-          className="text-muted-foreground hover:text-foreground rounded-xl -ml-2"
+          className="text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg -ml-2 touch-target"
         >
-          <ArrowLeft className="w-4 h-4 mr-2" />
+          <ArrowLeft className="w-5 h-5 mr-2" />
           Back
         </Button>
         
-        <div className="bg-muted px-4 py-2 rounded-xl">
-          <span className="text-lg font-mono font-medium text-foreground">
+        <div className="bg-gray-100 text-gray-800 px-4 py-2 rounded-xl border border-gray-200">
+          <span className="text-lg font-mono font-semibold">
             {formatTime(timeLeft)}
           </span>
         </div>
@@ -124,64 +224,75 @@ const RecordingInterface = ({ onComplete, onBack, userName }: RecordingInterface
 
       <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-8">
         <div className="text-center space-y-4 max-w-lg">
-          <h2 className="text-2xl md:text-3xl font-semibold text-foreground">
+          <h2 className="text-title text-gray-900">
             Korean Conversation Recording
           </h2>
-          <p className="text-muted-foreground">
-            Speak freely or practice sentences you want to improve. We'll analyze your pronunciation.
+          <p className="text-body text-gray-600">
+            Speak freely or practice sentences you want to improve. <br /> We'll analyze your pronunciation.
           </p>
         </div>
 
-        {/* Recording Button with Audio Visualization */}
+        {/* Recording Button with Real-time Audio Visualization */}
         <div className="relative">
           <button
             onClick={isRecording ? handleStopRecording : handleStartRecording}
             className={`
-              relative w-20 h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg
+              relative w-24 h-24 md:w-28 md:h-28 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg
               ${isRecording 
-                ? 'bg-red-500 hover:bg-red-600 scale-110' 
-                : 'bg-blue-600 hover:bg-blue-700 hover:scale-105'
+                ? 'bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 scale-110' 
+                : 'bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 hover:scale-105'
               }
             `}
           >
             {isRecording ? (
-              <Square className="w-8 h-8 md:w-10 md:h-10 text-white" />
+              <Square className="w-10 h-10 md:w-12 md:h-12 text-white" />
             ) : (
-              <Mic className="w-8 h-8 md:w-10 md:h-10 text-white" />
+              <Mic className="w-10 h-10 md:w-12 md:h-12 text-white" />
             )}
           </button>
           
-          {/* Pulse Animation */}
+          {/* Real-time Audio Level Visualization */}
           {isRecording && (
             <>
-              <div className="absolute inset-0 rounded-full border-4 border-red-300 animate-ping" />
+              {/* Base pulse animation */}
+              <div className="absolute inset-0 rounded-full border-4 border-red-300 animate-ping opacity-75" />
+              
+              {/* Dynamic audio level rings */}
               {isSpeaking && (
-                <div 
-                  className="absolute inset-0 rounded-full bg-red-200 opacity-40 transition-all duration-200"
-                  style={{ 
-                    transform: `scale(${1.2 + audioLevel / 200})`,
-                  }}
-                />
+                <>
+                  <div 
+                    className="absolute inset-0 rounded-full bg-red-200 opacity-30 transition-all duration-150"
+                    style={{ transform: `scale(${1.3 + (audioLevel / 100) * 0.8})` }}
+                  />
+                  <div 
+                    className="absolute inset-0 rounded-full bg-red-300 opacity-20 transition-all duration-100"
+                    style={{ transform: `scale(${1.5 + (audioLevel / 100) * 1.2})` }}
+                  />
+                  <div 
+                    className="absolute inset-0 rounded-full bg-red-400 opacity-10 transition-all duration-75"
+                    style={{ transform: `scale(${1.8 + (audioLevel / 100) * 1.5})` }}
+                  />
+                </>
               )}
             </>
           )}
         </div>
 
-        {/* Status Text */}
-        <div className="text-center space-y-3">
-          <p className="text-lg font-medium text-foreground">
+        <div className="text-center space-y-3 min-h-[110px]">
+          <p className="text-lg font-medium text-gray-900">
             {isRecording ? 'Listening...' : 'Tap to start recording'}
           </p>
           
           {isRecording && (
-            <div className="flex items-center justify-center space-x-3">
-              <div className="flex space-x-1">
-                <div className="w-1 h-4 bg-red-500 rounded-full animate-pulse" />
-                <div className="w-1 h-4 bg-red-500 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }} />
-                <div className="w-1 h-4 bg-red-500 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }} />
+            <div className="animate-fade-in space-y-3">
+              <div className="flex items-center justify-center space-x-4">
+                <div className="flex space-x-1">
+                  <div className="w-1 h-4 bg-red-500 rounded-full animate-pulse" />
+                  <div className="w-1 h-4 bg-red-500 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }} />
+                  <div className="w-1 h-4 bg-red-500 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }} />
+                </div>
+                <span className="text-sm text-gray-600 font-medium">Recording</span>
               </div>
-              <span className="text-sm text-muted-foreground">Recording</span>
-              {isSpeaking && <span className="text-sm text-green-600">• Voice detected</span>}
             </div>
           )}
         </div>
@@ -190,9 +301,7 @@ const RecordingInterface = ({ onComplete, onBack, userName }: RecordingInterface
         {isRecording && (
           <Button 
             onClick={handleStopRecording}
-            variant="outline"
-            size="lg"
-            className="rounded-xl px-8 py-3 font-medium"
+            className="btn-primary px-12"
           >
             Stop Recording
           </Button>

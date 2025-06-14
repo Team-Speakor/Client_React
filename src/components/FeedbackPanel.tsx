@@ -1,6 +1,6 @@
-
 import { Button } from "@/components/ui/button";
-import { X, Lightbulb, Volume2, BookOpen, Target } from "lucide-react";
+import { X, Lightbulb, BookOpen, Target } from "lucide-react";
+import { createPortal } from "react-dom";
 
 interface Error {
   word: string;
@@ -79,8 +79,8 @@ const FeedbackPanel = ({ segment, onClose }: FeedbackPanelProps) => {
     };
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+  return createPortal(
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
       <div className="bg-white rounded-lg shadow-premium-lg border border-gray-200 w-full max-w-4xl max-h-[90vh] overflow-hidden animate-slide-in-up">
         {/* Header */}
         <div className="flex items-start justify-between p-6 border-b border-gray-200 bg-white">
@@ -108,7 +108,7 @@ const FeedbackPanel = ({ segment, onClose }: FeedbackPanelProps) => {
         </div>
 
         {/* Scrollable Content */}
-        <div className="overflow-y-auto p-6 space-y-8" style={{ maxHeight: 'calc(90vh - 180px)' }}>
+        <div className="overflow-y-auto scrollbar-hide p-6 pb-8 space-y-8" style={{ maxHeight: 'calc(90vh - 140px)' }}>
           {/* Error Analysis */}
           {segment.errors?.map((error, index) => {
             const feedback = getDetailedFeedback(error.word);
@@ -176,19 +176,11 @@ const FeedbackPanel = ({ segment, onClose }: FeedbackPanelProps) => {
                     Record yourself to compare with the correct pronunciation.
                   </p>
                   <div className="bg-white rounded-lg p-4 border border-blue-200">
-                    <div className="flex items-center justify-between">
-                      <div>
+                    <div className="flex items-center justify-center">
+                      <div className="text-center">
                         <span className="text-subtitle font-semibold text-gray-900">{error.word}</span>
                         <p className="text-caption text-gray-600 font-mono mt-1">{feedback.ipa}</p>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="rounded-lg touch-target btn-secondary"
-                      >
-                        <Volume2 className="w-4 h-4 mr-2" />
-                        Listen
-                      </Button>
                     </div>
                   </div>
                 </div>
@@ -221,20 +213,9 @@ const FeedbackPanel = ({ segment, onClose }: FeedbackPanelProps) => {
             </div>
           </div>
         </div>
-
-        {/* Fixed Footer */}
-        <div className="p-6 border-t border-gray-200 bg-white">
-          <div className="flex justify-between items-center">
-            <p className="text-caption text-gray-600">
-              Continue practicing to improve your pronunciation accuracy
-            </p>
-            <Button onClick={onClose} className="btn-primary">
-              Close Analysis
-            </Button>
-          </div>
-        </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

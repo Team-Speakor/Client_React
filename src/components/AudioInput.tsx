@@ -2,74 +2,86 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Mic, Upload, FileAudio, Plus, Minus } from "lucide-react";
+import { api, handleApiError } from "../utils/api";
 
 interface AudioInputProps {
-  onComplete: (data: any, userName: string, participantCount: number) => void;
+  onComplete: (data: any, userName: string, participantCount: number, sessionId?: string) => void;
 }
 
 const AudioInput = ({ onComplete }: AudioInputProps) => {
   const [userName, setUserName] = useState("");
   const [participantCount, setParticipantCount] = useState(2);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isRecordingLoading, setIsRecordingLoading] = useState(false);
+  const [isUploadLoading, setIsUploadLoading] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
-  const handleRecordMode = () => {
+  const handleRecordMode = async () => {
+    console.log('🎤 handleRecordMode 시작', { userName, participantCount });
+    
     if (!userName.trim()) {
       alert("Please enter your name first");
       return;
     }
-    onComplete({ inputType: 'recording' }, userName, participantCount);
+
+    try {
+      setIsRecordingLoading(true);
+      console.log('🔄 세션 초기화 시작...');
+      
+      // 세션 초기화
+      const sessionResponse = await api.initSession(userName, participantCount);
+      console.log('✅ 세션 초기화 성공:', sessionResponse);
+      
+      setSessionId(sessionResponse.session_id);
+      
+      console.log('🚀 onComplete 호출 중...');
+      onComplete({ inputType: 'recording' }, userName, participantCount, sessionResponse.session_id);
+    } catch (error) {
+      console.error('❌ Session initialization failed:', error);
+      alert(handleApiError(error));
+    } finally {
+      setIsRecordingLoading(false);
+    }
   };
 
-  const handleFileUpload = (file: File) => {
+  const handleFileUpload = async (file: File) => {
+    console.log('📁 handleFileUpload 시작', { fileName: file.name, fileSize: file.size, userName, participantCount });
+    
     if (!userName.trim()) {
       alert("Please enter your name first");
       return;
     }
-    
-    // 파일 업로드 시 바로 onComplete 호출 - 로딩은 상위 컴포넌트에서 처리
-    onComplete({ 
-      inputType: 'file',
-      file: file,
-      transcript: [
-        {
-          speaker: 'user',
-          text: '안녕하세요, 저는 한국어를 배우고 있어요.',
-          errors: [
-            { word: '한국어를', position: 2, suggestion: 'Pronunciation needs improvement' },
-            { word: '배우고', position: 3, suggestion: 'Pronunciation needs improvement' }
-          ]
-        },
-        {
-          speaker: 'speaker1',
-          text: '안녕하세요! 한국어 공부하시는군요. 열심히 하세요.',
-          errors: []
-        },
-        {
-          speaker: 'user', 
-          text: '네, 감사합니다. 발음이 어려워서 연습하고 있어요.',
-          errors: [
-            { word: '발음이', position: 2, suggestion: 'Pronunciation needs improvement' }
-          ]
-        },
-        {
-          speaker: 'speaker2',
-          text: '천천히 하시면 됩니다. 계속 연습하시면 늘어요.',
-          errors: []
-        },
-        {
-          speaker: 'user',
-          text: '조언해주셔서 정말 고마워요.',
-          errors: [
-            { word: '조언해주셔서', position: 0, suggestion: 'Pronunciation needs improvement' }
-          ]
-        }
-      ],
-      speakers: Array.from({ length: participantCount }, (_, index) => ({
-        id: `speaker${index + 1}`,
-        name: `Speaker ${index + 1}`,
-        duration: ['2:30', '1:45', '0:45', '1:15', '2:10'][index] || '1:00'
-      }))
-    }, userName, participantCount);
+
+    try {
+      setIsUploadLoading(true);
+      console.log('🔄 파일 업로드 프로세스 시작...');
+      
+      // 1단계: 세션 초기화
+      console.log('1️⃣ 세션 초기화 중...');
+      const sessionResponse = await api.initSession(userName, participantCount);
+      console.log('✅ 세션 초기화 성공:', sessionResponse);
+      
+      setSessionId(sessionResponse.session_id);
+      
+      // 2단계: 파일 업로드
+      console.log('2️⃣ 파일 업로드 중...');
+      const uploadResponse = await api.uploadAudio(sessionResponse.session_id, file);
+      console.log('✅ 파일 업로드 성공:', uploadResponse);
+      
+      // 업로드 성공 시 다음 단계로 진행
+      console.log('🚀 onComplete 호출 중...');
+      onComplete({ 
+        inputType: 'file',
+        file: file,
+        uploadResponse: uploadResponse,
+        sessionId: sessionResponse.session_id
+      }, userName, participantCount, sessionResponse.session_id);
+      
+    } catch (error) {
+      console.error('❌ File upload failed:', error);
+      alert(handleApiError(error));
+      setIsUploadLoading(false);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -188,9 +200,9 @@ const AudioInput = ({ onComplete }: AudioInputProps) => {
             <Button 
               onClick={handleRecordMode}
               className="btn-primary w-full"
-              disabled={!userName.trim()}
+              disabled={!userName.trim() || isRecordingLoading}
             >
-              Start Recording
+              {isRecordingLoading ? "Initializing..." : "Start Recording"}
             </Button>
           </div>
 
@@ -240,10 +252,10 @@ const AudioInput = ({ onComplete }: AudioInputProps) => {
               <Button 
                 variant="outline" 
                 size="sm"
-                disabled={!userName.trim()}
+                disabled={!userName.trim() || isUploadLoading}
                 className="rounded-lg touch-target btn-secondary"
               >
-                Select File
+                {isUploadLoading ? "Uploading..." : "Select File"}
               </Button>
               <p className="text-caption text-muted-foreground mt-4">
                 Supported formats: MP3, WAV, M4A

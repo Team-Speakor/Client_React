@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Play, Pause, RotateCcw, Eye, EyeOff, ChevronRight } from "lucide-react";
 import FeedbackPanel from "./FeedbackPanel";
@@ -18,6 +18,8 @@ interface TranscriptItem {
 interface AnalysisResultsProps {
   data: {
     transcript?: TranscriptItem[];
+    audioFile?: File;
+    uploadResponse?: any;
   };
   userName: string;
   selectedSpeaker: string;
@@ -28,6 +30,8 @@ const AnalysisResults = ({ data, userName, selectedSpeaker, onStartOver }: Analy
   const [selectedSegment, setSelectedSegment] = useState<TranscriptItem | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showAllFeedback, setShowAllFeedback] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
 
   // Mock transcript with Korean examples if no real data
   const mockTranscript: TranscriptItem[] = [
@@ -60,17 +64,74 @@ const AnalysisResults = ({ data, userName, selectedSpeaker, onStartOver }: Analy
 
   const transcript = data?.transcript && data.transcript.length > 0 ? data.transcript : mockTranscript;
 
-  const handlePlayRecording = () => {
-    if (isPlaying) {
-      setIsPlaying(false);
-      console.log("Stopping recording playback");
-    } else {
-      setIsPlaying(true);
-      console.log("Playing full recording");
+  // 오디오 URL 생성 및 정리
+  useEffect(() => {
+    if (data?.audioFile) {
+      const url = URL.createObjectURL(data.audioFile);
+      setAudioUrl(url);
+      console.log('🎵 오디오 URL 생성:', url);
       
-      setTimeout(() => {
-        setIsPlaying(false);
-      }, 3000);
+      return () => {
+        URL.revokeObjectURL(url);
+        console.log('🗑️ 오디오 URL 정리');
+      };
+    }
+  }, [data?.audioFile]);
+
+  // 오디오 재생 완료 시 상태 업데이트
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const handleEnded = () => {
+      setIsPlaying(false);
+      console.log('🎵 오디오 재생 완료');
+    };
+
+    const handleError = (e: Event) => {
+      setIsPlaying(false);
+      console.error('❌ 오디오 재생 오류:', e);
+      alert('오디오 재생 중 오류가 발생했습니다.');
+    };
+
+    audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('error', handleError);
+
+    return () => {
+      audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('error', handleError);
+    };
+  }, []);
+
+  const handlePlayRecording = () => {
+    if (!audioUrl) {
+      console.log('⚠️ 재생할 오디오가 없습니다');
+      alert('재생할 오디오가 없습니다. 다시 녹음해주세요.');
+      return;
+    }
+
+    if (isPlaying) {
+      // 재생 중지
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+      setIsPlaying(false);
+      console.log('⏹️ 오디오 재생 중지');
+    } else {
+      // 재생 시작
+      if (audioRef.current) {
+        audioRef.current.src = audioUrl;
+        audioRef.current.play()
+          .then(() => {
+            setIsPlaying(true);
+            console.log('▶️ 오디오 재생 시작');
+          })
+          .catch((error) => {
+            console.error('❌ 오디오 재생 실패:', error);
+            alert('오디오 재생에 실패했습니다.');
+          });
+      }
     }
   };
 
@@ -176,6 +237,9 @@ const AnalysisResults = ({ data, userName, selectedSpeaker, onStartOver }: Analy
 
   return (
     <div className="min-h-screen bg-white page-container">
+      {/* Hidden audio element for playback */}
+      <audio ref={audioRef} style={{ display: 'none' }} />
+      
       <div className="space-y-8 animate-slide-in-up">
         {/* Header */}
         <div className="premium-card p-6 md:p-8">

@@ -4,6 +4,7 @@ import RecordingInterface from "@/components/RecordingInterface";
 import SpeakerSelection from "@/components/SpeakerSelection";
 import AnalysisResults from "@/components/AnalysisResults";
 import AudioInput from "@/components/AudioInput";
+import { api, handleApiError } from "@/utils/api";
 
 type AppState = 'input' | 'recording' | 'processing' | 'speaker-selection' | 'results';
 
@@ -27,38 +28,96 @@ const Index = () => {
   const [userName, setUserName] = useState<string>('');
   const [participantCount, setParticipantCount] = useState<number>(2);
   const [selectedSpeaker, setSelectedSpeaker] = useState<string>('');
+  const [sessionId, setSessionId] = useState<string>('');
 
-  const handleAudioInputComplete = (data: any, name: string, participants: number) => {
+  const handleAudioInputComplete = async (data: any, name: string, participants: number, sessionIdFromInput?: string) => {
     setUserName(name);
     setParticipantCount(participants);
+    
+    if (sessionIdFromInput) {
+      setSessionId(sessionIdFromInput);
+    }
+    
     if (data.inputType === 'recording') {
       setAppState('recording');
     } else {
-      setRecordedData(data);
+      // 파일 업로드 완료 후 화자 분리 시작
+      setRecordedData({
+        ...data,
+        audioFile: data.file // 업로드된 원본 파일 유지
+      });
       setProcessingMessage('Analyzing speakers and preparing for selection...');
       setAppState('processing');
-      setTimeout(() => {
+      
+      try {
+        // 화자 분리 API 호출
+        await api.diarizeAudio(sessionIdFromInput!);
         setAppState('speaker-selection');
-      }, 2500);
+      } catch (error) {
+        console.error('Diarization failed:', error);
+        alert(handleApiError(error));
+        setAppState('input');
+      }
     }
   };
 
-  const handleRecordingComplete = (data: any) => {
+  const handleRecordingComplete = async (data: any) => {
     setRecordedData(data);
     setProcessingMessage('Analyzing speakers and preparing for selection...');
     setAppState('processing');
-    setTimeout(() => {
+    
+    try {
+      // 녹음 파일이 있는 경우 업로드 먼저 실행
+      if (data.audioFile && data.sessionId) {
+        console.log('📤 녹음 파일 업로드 시작...');
+        const uploadResponse = await api.uploadAudio(data.sessionId, data.audioFile);
+        console.log('✅ 업로드 완료:', uploadResponse);
+        
+        // 업로드 완료 후 화자 분리 실행
+        console.log('🔄 화자 분리 시작...');
+        await api.diarizeAudio(data.sessionId);
+        console.log('✅ 화자 분리 완료');
+        
+        // 데이터 업데이트
+        setRecordedData({
+          ...data,
+          uploadResponse: uploadResponse,
+          diarizationComplete: true
+        });
+      }
+      
       setAppState('speaker-selection');
-    }, 2500);
+    } catch (error) {
+      console.error('❌ Recording processing failed:', error);
+      alert(handleApiError(error));
+      setAppState('input');
+    }
   };
 
-  const handleSpeakerSelected = (speakerId: string) => {
+  const handleSpeakerSelected = async (speakerId: string) => {
     setSelectedSpeaker(speakerId);
     setProcessingMessage('Performing final analysis...');
     setAppState('processing');
-    setTimeout(() => {
+    
+    try {
+      // 화자 선택 API 호출
+      await api.selectSpeaker(sessionId, speakerId);
+      
+      // 음성 분석 API 호출
+      const analysisResult = await api.analyzeAudio(sessionId);
+      
+      if (analysisResult) {
+        // 실제 분석 결과가 있는 경우
+        setRecordedData({ ...recordedData, analysisResult });
+      }
+      // null인 경우 Mock 데이터 사용 (현재 상황)
+      
       setAppState('results');
-    }, 2500);
+    } catch (error) {
+      console.error('Speaker selection or analysis failed:', error);
+      alert(handleApiError(error));
+      setAppState('speaker-selection');
+    }
   };
 
   const handleStartOver = () => {
@@ -67,6 +126,7 @@ const Index = () => {
     setUserName('');
     setParticipantCount(2);
     setSelectedSpeaker('');
+    setSessionId('');
   };
 
   const renderContent = () => {
@@ -74,11 +134,11 @@ const Index = () => {
       case 'input':
         return <AudioInput onComplete={handleAudioInputComplete} />;
       case 'recording':
-        return <RecordingInterface onComplete={handleRecordingComplete} onBack={() => setAppState('input')} userName={userName} />;
+        return <RecordingInterface onComplete={handleRecordingComplete} onBack={() => setAppState('input')} userName={userName} sessionId={sessionId} />;
       case 'processing':
         return <Processing message={processingMessage} />;
       case 'speaker-selection':
-        return <SpeakerSelection audioData={recordedData} userName={userName} participantCount={participantCount} onSpeakerSelected={handleSpeakerSelected} onBack={() => setAppState('input')} />;
+        return <SpeakerSelection audioData={recordedData} userName={userName} participantCount={participantCount} sessionId={sessionId} onSpeakerSelected={handleSpeakerSelected} onBack={() => setAppState('input')} />;
       case 'results':
         return <AnalysisResults data={recordedData} userName={userName} selectedSpeaker={selectedSpeaker} onStartOver={handleStartOver} />;
       default:

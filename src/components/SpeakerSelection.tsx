@@ -141,15 +141,10 @@ const SpeakerSelection = ({ audioData, userName, participantCount, sessionId, on
       audio.preload = 'metadata'; // 메타데이터만 로드
       
       audio.onloadedmetadata = () => {
-        console.log(`📏 ${speaker.name} 길이 측정 완료:`, {
-          duration: audio.duration,
-          formatted: formatDuration(audio.duration)
-        });
         resolve(audio.duration);
       };
 
       audio.onerror = (error) => {
-        console.error(`❌ ${speaker.name} 길이 측정 실패:`, error);
         reject(error);
       };
 
@@ -159,18 +154,12 @@ const SpeakerSelection = ({ audioData, userName, participantCount, sessionId, on
 
   // 화자 목록의 오디오 길이를 측정하는 함수
   const measureAllDurations = async (speakerList: Speaker[]) => {
-    console.log('📏 모든 화자의 오디오 길이 측정 시작...');
-    
-    // 순차적으로 처리하여 서버 부하 줄이기
     for (const speaker of speakerList) {
       if (!speaker.audioUrl) continue;
 
       try {
-        console.log(`📏 ${speaker.name} 길이 측정 시작...`);
-        
         const duration = await measureAudioDuration(speaker);
         
-        // 측정 완료 후 업데이트
         setSpeakers(prev => prev.map(s => 
           s.id === speaker.id 
             ? { 
@@ -181,13 +170,8 @@ const SpeakerSelection = ({ audioData, userName, participantCount, sessionId, on
               }
             : s
         ));
-
-        console.log(`✅ ${speaker.name} 길이 측정 완료: ${formatDuration(duration)}`);
         
       } catch (error) {
-        console.error(`❌ ${speaker.name} 길이 측정 실패:`, error);
-        
-        // 측정 실패 시 기본값으로 설정
         setSpeakers(prev => prev.map(s => 
           s.id === speaker.id 
             ? { 
@@ -199,8 +183,6 @@ const SpeakerSelection = ({ audioData, userName, participantCount, sessionId, on
         ));
       }
     }
-
-    console.log('✅ 모든 화자의 오디오 길이 측정 완료');
   };
 
   // API에서 화자 미리보기 데이터 가져오기
@@ -209,30 +191,21 @@ const SpeakerSelection = ({ audioData, userName, participantCount, sessionId, on
       try {
         const response = await api.previewSpeakers(sessionId);
         
-        // 개발 환경에서는 프록시 사용, 프로덕션에서는 직접 URL 사용
         const isDev = import.meta.env.DEV;
         const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
-        console.log('🌐 환경 정보:', { isDev, apiBaseUrl });
         
-        // API 응답을 Speaker 형태로 변환
         const apiSpeakers: Speaker[] = response.previews.map((preview, index) => ({
           id: preview.speaker,
           name: `Speaker ${index + 1}`,
-          duration: 'Measuring...', // 초기값
-          // 개발 환경에서는 프록시 경로 사용, 프로덕션에서는 전체 URL 사용
+          duration: 'Measuring...',
           audioUrl: isDev ? preview.url : `${apiBaseUrl}${preview.url}`,
           isLoadingDuration: true
         }));
         
         setSpeakers(apiSpeakers);
-        console.log('🎵 화자 데이터 로드 완료:', apiSpeakers);
-
-        // 오디오 길이 측정 시작
         measureAllDurations(apiSpeakers);
         
       } catch (error) {
-        console.error('Failed to fetch speakers:', error);
-        // 실패 시 기본 speakers 생성
         const fallbackSpeakers: Speaker[] = Array.from({ length: participantCount }, (_, index) => ({
           id: `SPEAKER_${String(index).padStart(2, '0')}`,
           name: `Speaker ${index + 1}`,
@@ -250,100 +223,48 @@ const SpeakerSelection = ({ audioData, userName, participantCount, sessionId, on
   const handlePlaySample = async (speakerId: string) => {
     const speaker = speakers.find(s => s.id === speakerId);
     if (!speaker?.audioUrl) {
-      console.log('❌ Audio URL not available for', speakerId);
       return;
     }
 
-    console.log('🎵 음원 재생 시도 시작:', {
-      speakerId,
-      audioUrl: speaker.audioUrl,
-      currentPlayingSpeaker: playingSpeaker,
-      hasCurrentAudio: !!currentAudio,
-      isDev: import.meta.env.DEV
-    });
-
-    // 현재 재생 중인 오디오 정지
     if (currentAudio) {
-      console.log('⏹️ 현재 재생 중인 오디오 정지');
       currentAudio.pause();
       currentAudio.currentTime = 0;
     }
 
-    // 이미 재생 중인 경우 정지
     if (playingSpeaker === speakerId) {
-      console.log('⏸️ 같은 화자 재생 중 - 정지');
       setPlayingSpeaker('');
       setCurrentAudio(null);
       return;
     }
 
-    // 새 오디오 객체 생성 또는 기존 것 재사용
     let audio = audioRefs.current[speakerId];
     if (!audio) {
-      console.log('🆕 새 오디오 객체 생성');
       audio = new Audio();
       audioRefs.current[speakerId] = audio;
-    } else {
-      console.log('♻️ 기존 오디오 객체 재사용');
     }
 
-    // 오디오 소스 설정
     if (audio.src !== speaker.audioUrl) {
-      console.log('🔗 오디오 소스 설정:', speaker.audioUrl);
       audio.src = speaker.audioUrl;
     }
 
     setPlayingSpeaker(speakerId);
     setCurrentAudio(audio);
 
-    // 이벤트 리스너 설정 (한 번만)
-    if (!audio.onloadstart) {
-      audio.onloadstart = () => {
-        console.log('📥 오디오 로드 시작');
-      };
-
-      audio.oncanplay = () => {
-        console.log('✅ 오디오 재생 준비 완료');
-      };
-
-      audio.onloadeddata = () => {
-        console.log('📊 오디오 데이터 로드 완료');
-      };
-
+    if (!audio.onended) {
       audio.onended = () => {
-        console.log('🏁 오디오 재생 완료');
         setPlayingSpeaker('');
         setCurrentAudio(null);
       };
       
       audio.onerror = (error) => {
-        console.error('❌ 오디오 재생 오류:', {
-          error,
-          audioError: audio.error,
-          networkState: audio.networkState,
-          readyState: audio.readyState,
-          src: audio.src
-        });
         setPlayingSpeaker('');
         setCurrentAudio(null);
       };
     }
 
-    // 재생 시도
     try {
-      console.log('▶️ 오디오 재생 시도...');
       await audio.play();
-      console.log('✅ 오디오 재생 성공!');
     } catch (error) {
-      console.error('❌ 오디오 재생 실패:', {
-        error,
-        errorName: error.name,
-        errorMessage: error.message,
-        audioSrc: audio.src,
-        audioReadyState: audio.readyState,
-        audioNetworkState: audio.networkState
-      });
-      
       setPlayingSpeaker('');
       setCurrentAudio(null);
     }
@@ -351,7 +272,6 @@ const SpeakerSelection = ({ audioData, userName, participantCount, sessionId, on
 
   const handleContinue = () => {
     if (selectedSpeaker) {
-      // 재생 중인 오디오 정지
       if (currentAudio) {
         currentAudio.pause();
         currentAudio.currentTime = 0;

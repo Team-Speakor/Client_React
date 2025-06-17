@@ -13,7 +13,7 @@ interface TranscriptItem {
   speaker: string;
   text: string;
   errors: Error[];
-  originalSegment?: LLMSegment; // 실제 API 데이터가 있는 경우
+  originalSegment?: LLMSegment;
 }
 
 interface FeedbackPanelProps {
@@ -22,7 +22,6 @@ interface FeedbackPanelProps {
 }
 
 const FeedbackPanel = ({ segment, onClose }: FeedbackPanelProps) => {
-  // 실제 API 데이터가 있는지 확인 - 조건 완화
   const hasRealData = segment.originalSegment && 
                      (segment.originalSegment.improvement_tips &&
                       segment.originalSegment.improvement_tips.trim() !== "" &&
@@ -30,28 +29,23 @@ const FeedbackPanel = ({ segment, onClose }: FeedbackPanelProps) => {
                      (segment.originalSegment.masked_text && 
                       segment.originalSegment.masked_text.includes('[w]'));
 
-  // API 데이터에서 팁을 배열로 파싱하는 함수
   const parseApiTips = (tipsString: string): string[] => {
     if (!tipsString || tipsString.trim() === "") return [];
     
-    // 큰따옴표로 감싸진 팁들을 추출
     const matches = tipsString.match(/"([^"]+)"/g);
     if (matches) {
       return matches.map(match => match.replace(/"/g, ''));
     }
     
-    // 큰따옴표가 없으면 콤마로 분할
     return tipsString.split(',').map(tip => tip.trim()).filter(tip => tip.length > 0);
   };
 
-  // 에러 분석 함수 - 실제 API 데이터만 사용
   const analyzeSegmentErrors = () => {
     if (hasRealData && segment.originalSegment) {
       const apiSegment = segment.originalSegment;
       
-      // 실제 API 데이터만 사용
       return [{
-        word: segment.text, // 전체 텍스트
+        word: segment.text,
         ipa: apiSegment.correct_ipa || '',
         tips: parseApiTips(apiSegment.improvement_tips),
         commonMistakes: parseApiTips(apiSegment.common_mistakes),
@@ -59,14 +53,12 @@ const FeedbackPanel = ({ segment, onClose }: FeedbackPanelProps) => {
         practiceTips: parseApiTips(apiSegment.practice_tips)
       }];
     } else {
-      // API 데이터가 없으면 빈 배열 반환
       return [];
     }
   };
 
   const errorAnalysis = analyzeSegmentErrors();
 
-  // API 데이터가 없으면 패널을 표시하지 않음
   if (!hasRealData || errorAnalysis.length === 0) {
     return null;
   }
@@ -74,7 +66,6 @@ const FeedbackPanel = ({ segment, onClose }: FeedbackPanelProps) => {
   return createPortal(
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
       <div className="bg-white rounded-lg shadow-premium-lg border border-gray-200 w-full max-w-4xl max-h-[90vh] overflow-hidden animate-slide-in-up">
-        {/* Header */}
         <div className="flex items-start justify-between p-6 border-b border-gray-200 bg-white">
           <div className="flex-1">
             <h3 className="text-subtitle font-semibold text-gray-900 mb-2">
@@ -99,13 +90,10 @@ const FeedbackPanel = ({ segment, onClose }: FeedbackPanelProps) => {
           </Button>
         </div>
 
-        {/* Scrollable Content */}
         <div className="overflow-y-auto scrollbar-hide p-6 pb-8 space-y-8" style={{ maxHeight: 'calc(90vh - 140px)' }}>
-          {/* Error Analysis */}
           {errorAnalysis.map((analysis, index) => (
             <div key={index} className="premium-card p-6 space-y-6">
               <div className="grid md:grid-cols-2 gap-6">
-                {/* Improvement Tips */}
                 <div>
                   <h5 className="text-body font-medium text-gray-900 mb-4 flex items-center">
                     <Lightbulb className="w-4 h-4 mr-2 text-yellow-600" />
@@ -127,7 +115,6 @@ const FeedbackPanel = ({ segment, onClose }: FeedbackPanelProps) => {
                   )}
                 </div>
 
-                {/* Common Mistakes */}
                 <div>
                   <h5 className="text-body font-medium text-gray-900 mb-4 flex items-center">
                     <Target className="w-4 h-4 mr-2 text-red-600" />
@@ -148,7 +135,6 @@ const FeedbackPanel = ({ segment, onClose }: FeedbackPanelProps) => {
                 </div>
               </div>
 
-              {/* Overall Pronunciation Guidance */}
               <div className="bg-blue-50 rounded-lg p-5 border border-blue-200">
                 <h5 className="text-body font-medium text-blue-800 mb-4 flex items-center">
                   <BookOpen className="w-4 h-4 mr-2" />

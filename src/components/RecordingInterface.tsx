@@ -25,7 +25,6 @@ const RecordingInterface = ({ onComplete, onBack, userName, sessionId }: Recordi
   const animationFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
-    // On component unmount, close the single AudioContext
     return () => {
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
         audioContextRef.current.close();
@@ -96,23 +95,14 @@ const RecordingInterface = ({ onComplete, onBack, userName, sessionId }: Recordi
   };
 
   const handleStopRecording = useCallback(async () => {
-    console.log('🛑 녹음 중지 시작', { 
-      recordedChunksLength: recordedChunks.length, 
-      sessionId, 
-      mediaRecorderState: mediaRecorder?.state 
-    });
-    
     setIsRecording(false);
 
-    // Stop MediaRecorder
     if (mediaRecorder && mediaRecorder.state === 'recording') {
       mediaRecorder.stop();
-      console.log('📹 MediaRecorder 중지됨');
     }
 
     if (audioStream) {
       audioStream.getTracks().forEach(track => track.stop());
-      console.log('🎤 오디오 스트림 중지됨');
     }
 
     if (sourceRef.current) {
@@ -120,8 +110,6 @@ const RecordingInterface = ({ onComplete, onBack, userName, sessionId }: Recordi
       sourceRef.current = null;
     }
     analyserRef.current = null;
-    
-    console.log('🔍 녹음 중지 완료, MediaRecorder onstop 이벤트에서 업로드 처리됨');
   }, [mediaRecorder, audioStream, onComplete, userName, recordedChunks, sessionId]);
 
   useEffect(() => {
@@ -164,25 +152,16 @@ const RecordingInterface = ({ onComplete, onBack, userName, sessionId }: Recordi
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           chunks.push(event.data);
-          console.log('📊 녹음 데이터 수신:', { chunkSize: event.data.size, totalChunks: chunks.length });
         }
       };
       
       recorder.onstop = () => {
-        console.log('🎬 MediaRecorder onstop 이벤트:', { chunksCount: chunks.length, sessionId });
         setRecordedChunks(chunks);
         
-        // 녹음 완료 시 데이터와 함께 onComplete 호출 (Processing 페이지로 이동)
         if (chunks.length > 0 && sessionId) {
-          console.log('🎙️ 녹음 완료, Processing 페이지로 이동');
-          
-          // Blob을 File로 변환
           const audioBlob = new Blob(chunks, { type: 'audio/wav' });
           const audioFile = new File([audioBlob], 'recording.wav', { type: 'audio/wav' });
           
-          console.log('📁 오디오 파일 생성:', { size: audioFile.size, type: audioFile.type });
-          
-          // 녹음 데이터와 함께 onComplete 호출 (업로드는 Processing 페이지에서 처리)
           onComplete({
             inputType: 'recording',
             audioFile: audioFile,
@@ -190,8 +169,6 @@ const RecordingInterface = ({ onComplete, onBack, userName, sessionId }: Recordi
           });
           
         } else {
-          console.log('⚠️ 녹음 데이터 없음 또는 sessionId 없음, Mock 데이터 사용');
-          // Mock 데이터 사용
           const sampleData = {
             transcript: [
               {
@@ -216,14 +193,12 @@ const RecordingInterface = ({ onComplete, onBack, userName, sessionId }: Recordi
       recorder.start();
       setIsRecording(true);
     } catch (error) {
-      console.error('Failed to start recording:', error);
       alert('마이크 접근 권한이 필요합니다. 브라우저 설정을 확인해주세요.');
     }
   };
 
   return (
     <div className="space-y-8 animate-slide-in-up">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <Button 
           onClick={onBack}
@@ -252,7 +227,6 @@ const RecordingInterface = ({ onComplete, onBack, userName, sessionId }: Recordi
           </p>
         </div>
 
-        {/* Recording Button with Real-time Audio Visualization */}
         <div className="relative">
           <button
             onClick={isRecording ? handleStopRecording : handleStartRecording}
@@ -271,13 +245,10 @@ const RecordingInterface = ({ onComplete, onBack, userName, sessionId }: Recordi
             )}
           </button>
           
-          {/* Real-time Audio Level Visualization */}
           {isRecording && (
             <>
-              {/* Base pulse animation */}
               <div className="absolute inset-0 rounded-full border-4 border-red-300 animate-ping opacity-75" />
               
-              {/* Dynamic audio level rings */}
               {isSpeaking && (
                 <>
                   <div 
@@ -317,7 +288,6 @@ const RecordingInterface = ({ onComplete, onBack, userName, sessionId }: Recordi
           )}
         </div>
 
-        {/* Stop Button */}
         {isRecording && (
           <Button 
             onClick={handleStopRecording}

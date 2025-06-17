@@ -2,8 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Premium ChatGPT/Apple-inspired design system */
-
 @layer base {
   :root {
     --background: 255 255 255;
@@ -117,9 +115,7 @@
   }
 }
 
-/* Premium ChatGPT/Apple component styling */
 @layer components {
-  /* Core container styling */
   .page-container {
     background-color: #ffffff !important;
     min-height: 100vh !important;
@@ -133,7 +129,7 @@
     background-color: #ffffff !important;
   }
 
-  /* Premium card design */
+
   .premium-card {
     background: #fbfbfb !important;
     border: 1px solid #e5e5ea !important;
@@ -142,7 +138,7 @@
     transition: all 0.15s ease !important;
   }
 
-  /* ChatGPT-style input fields */
+
   .input-field {
     background: #ffffff !important;
     border: 1.5px solid #d1d1d6 !important;
@@ -161,7 +157,7 @@
     outline: none !important;
   }
 
-  /* Apple iOS button system */
+
   .btn-primary {
     background: #007aff !important;
     color: #ffffff !important;
@@ -197,7 +193,7 @@
     transform: translateY(-1px) !important;
   }
 
-  /* Speaker card improvements */
+
   .speaker-card {
     background: #ffffff !important;
     border: 1.5px solid #e5e5ea !important;
@@ -219,7 +215,7 @@
     box-shadow: 0 4px 16px rgba(0, 122, 255, 0.1);
   }
 
-  /* Waveform visualization */
+
   .waveform-bar {
     background: #d1d1d6 !important;
     border-radius: 2px;
@@ -232,7 +228,7 @@
     animation: pulse 0.5s ease-out !important;
   }
 
-  /* Stepper input styling */
+
   .stepper-input {
     background: #f2f2f7 !important;
     border-radius: 8px !important;
@@ -266,7 +262,7 @@
     cursor: not-allowed;
   }
 
-  /* Error highlighting */
+
   .error-word {
     color: #ff3b30 !important;
     text-decoration: underline !important;
@@ -282,7 +278,7 @@
     background-color: rgba(255, 59, 48, 0.1) !important;
   }
 
-  /* Segment highlight */
+
   .segment-highlight {
     background-color: rgba(255, 59, 48, 0.05) !important;
     border-left: 4px solid #ff3b30 !important;
@@ -290,7 +286,7 @@
     border-bottom-right-radius: 8px !important;
   }
 
-  /* Premium recording interface */
+
   .recording-button {
     background: #007aff !important;
     border: none !important;
@@ -306,7 +302,7 @@
     animation: pulse 2s infinite !important;
   }
 
-  /* Timer display */
+
   .timer-display {
     color: #1c1c1e !important;
     font-weight: 600 !important;
@@ -317,7 +313,7 @@
     border-radius: 8px !important;
   }
 
-  /* Stats cards */
+
   .stat-card {
     background: #ffffff !important;
     border: 1px solid #e5e5ea !important;
@@ -331,7 +327,7 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
   }
 
-  /* Upload section */
+
   .upload-section {
     background: #f8f9fa !important;
     border: 2px dashed #d1d1d6 !important;
@@ -346,7 +342,7 @@
     background: #f0f8ff !important;
   }
 
-  /* Enhanced feedback buttons */
+
   .view-feedback-button,
   .hide-feedback-button {
     background: #007aff !important;
@@ -369,9 +365,7 @@
   }
 }
 
-/* Typography scale */
 @layer utilities {
-  /* Premium shadows */
   .shadow-premium {
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   }
@@ -380,7 +374,7 @@
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
   }
 
-  /* Typography hierarchy */
+
   .text-display {
     @apply text-4xl font-bold leading-tight tracking-tight;
     color: #1c1c1e !important;
@@ -698,38 +692,6 @@ input:focus,
 }
 
 /* Duration measurement styles */
-.duration-loading {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: #6b7280;
-  font-size: 0.875rem;
-}
-
-.duration-spinner {
-  width: 12px;
-  height: 12px;
-  border: 1px solid #3b82f6;
-  border-top: 1px solid transparent;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-.duration-measured {
-  color: #3b82f6;
-  font-weight: 500;
-  font-size: 0.875rem;
-}
-
-.duration-error {
-  color: #ef4444;
-  font-size: 0.875rem;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
 .duration-loading {
   display: inline-flex;
   align-items: center;

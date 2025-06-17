@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Mic } from "lucide-react";
@@ -14,7 +13,6 @@ const InitialRecording = ({ onComplete }: InitialRecordingProps) => {
   const handleRecordingToggle = () => {
     if (!isRecording) {
       setIsRecording(true);
-      console.log("음성 등록 녹음 시작");
       
       setTimeout(() => {
         setIsRecording(false);

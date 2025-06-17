@@ -79,22 +79,17 @@ export const api = {
     const url = `${API_BASE_URL}/api/session/init`;
     const payload = { nickname, participant_count: participantCount };
     
-    console.log('🌐 API 호출:', { url, payload, API_BASE_URL });
-    
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
     
-    console.log('📡 API 응답:', { status: response.status, statusText: response.statusText });
-    
     if (!response.ok) {
       throw new Error(`Session init failed: ${response.statusText}`);
     }
     
     const result = await response.json();
-    console.log('📦 API 결과:', result);
     return result;
   },
 
@@ -105,23 +100,18 @@ export const api = {
     formData.append('file', file);
     
     const url = `${API_BASE_URL}/api/upload`;
-    console.log('📤 파일 업로드 API 호출:', { url, sessionId, fileName: file.name, fileSize: file.size, API_BASE_URL });
     
     const response = await fetch(url, {
       method: 'POST',
       body: formData
     });
     
-    console.log('📡 파일 업로드 API 응답:', { status: response.status, statusText: response.statusText });
-    
     if (!response.ok) {
       const errorText = await response.text();
-      console.log('❌ 파일 업로드 오류 상세:', errorText);
       throw new Error(`Upload failed: ${response.statusText} - ${errorText}`);
     }
     
     const result = await response.json();
-    console.log('📦 파일 업로드 결과:', result);
     return result;
   },
 
@@ -130,24 +120,18 @@ export const api = {
     const url = `${API_BASE_URL}/api/diarization`;
     const payload = { session_id: sessionId };
     
-    console.log('🎭 화자 분리 API 호출:', { url, payload, API_BASE_URL });
-    
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
     
-    console.log('📡 화자 분리 API 응답:', { status: response.status, statusText: response.statusText });
-    
     if (!response.ok) {
       const errorText = await response.text();
-      console.log('❌ 화자 분리 오류 상세:', errorText);
       throw new Error(`Diarization failed: ${response.statusText} - ${errorText}`);
     }
     
     const result = await response.json();
-    console.log('📦 화자 분리 결과:', result);
     return result;
   },
 
@@ -186,24 +170,18 @@ export const api = {
     const url = `${API_BASE_URL}/api/inference/stt`;
     const payload = { session_id: sessionId };
     
-    console.log('🎤 STT API 호출:', { url, payload, API_BASE_URL });
-    
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
     
-    console.log('📡 STT API 응답:', { status: response.status, statusText: response.statusText });
-    
     if (!response.ok) {
       const errorText = await response.text();
-      console.log('❌ STT 오류 상세:', errorText);
       throw new Error(`STT failed: ${response.statusText} - ${errorText}`);
     }
     
     const result = await response.json();
-    console.log('📦 STT 결과:', result);
     return result;
   },
 
@@ -212,31 +190,23 @@ export const api = {
     const url = `${API_BASE_URL}/api/inference/llm`;
     const payload = { session_id: sessionId };
     
-    console.log('🤖 LLM API 호출:', { url, payload, API_BASE_URL });
-    
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
     
-    console.log('📡 LLM API 응답:', { status: response.status, statusText: response.statusText });
-    
     if (!response.ok) {
       const errorText = await response.text();
-      console.log('❌ LLM 오류 상세:', errorText);
       throw new Error(`LLM analysis failed: ${response.statusText} - ${errorText}`);
     }
     
     const result = await response.json();
-    console.log('📦 LLM 결과:', result);
-    console.log('🔍 원본 API 응답 (수정하지 말고 그대로):', JSON.stringify(result, null, 2));
     return result;
   },
 
   // 음성 분석 (기존 - 제거)
   analyzeAudio: async (sessionId: string): Promise<InferenceResponse | null> => {
-    console.warn('⚠️ analyzeAudio는 더 이상 사용되지 않습니다. performSTT와 performLLMAnalysis를 사용하세요.');
     return null;
   },
 
@@ -252,8 +222,6 @@ export const api = {
 
 // 오류 처리 유틸리티
 export const handleApiError = (error: any) => {
-  console.error('API Error:', error);
-  
   if (error.detail) {
     // 422 Validation Error
     return `Validation Error: ${error.detail.map((d: any) => d.msg).join(', ')}`;
@@ -328,22 +296,6 @@ export const calculateStats = (segments: (LLMSegment & { display_name?: string }
   
   const segmentAccuracy = totalSegments > 0 ? Math.round((perfectSegments / totalSegments) * 100) : 100;
   
-  console.log('📊 통계 계산 (선택한 화자만):', {
-    selectedSpeaker,
-    userNickname,
-    totalSegmentsInInput: segments.length,
-    userSegmentsFound: userSegments.length,
-    segmentsWithErrors,
-    perfectSegments,
-    totalErrors,
-    segmentAccuracy,
-    userSegmentSample: userSegments.slice(0, 3).map(s => ({ 
-      display_name: s.display_name, 
-      speaker_name: s.speaker_name, 
-      text: s.correct_text?.substring(0, 20) 
-    }))
-  });
-  
   return {
     segmentAccuracy,
     perfectSegments,
@@ -381,38 +333,19 @@ export const runFullAnalysis = async (
   onProgressUpdate?: (step: 'stt' | 'llm', message: string) => void
 ) => {
   try {
-    console.log('🚀 전체 분석 플로우 시작:', { sessionId, selectedSpeaker, userNickname });
-    
-    // 1. STT 실행
-    console.log('1️⃣ STT 실행 중...');
     if (onProgressUpdate) {
-              onProgressUpdate('stt', 'Converting audio to text...');
+      onProgressUpdate('stt', 'Converting audio to text...');
     }
     const sttResult = await api.performSTT(sessionId);
-    console.log('✅ STT 완료:', sttResult.message);
     
-    // 2. LLM 실행
-    console.log('2️⃣ LLM 실행 중...');
     if (onProgressUpdate) {
-              onProgressUpdate('llm', 'AI is analyzing pronunciation...');
+      onProgressUpdate('llm', 'AI is analyzing pronunciation...');
     }
     const llmResult = await api.performLLMAnalysis(sessionId);
-    console.log('✅ LLM 완료:', llmResult.message);
     
-    // 3. 데이터 정제 및 화자 매핑
-    console.log('3️⃣ 데이터 처리 중...');
     const cleanedSegments = cleanSegmentData(llmResult.final_response);
-    console.log('🧹 데이터 정제 완료:', { 
-      original: llmResult.final_response.length, 
-      cleaned: cleanedSegments.length 
-    });
-    
     const mappedSegments = mapSpeakerNames(cleanedSegments, selectedSpeaker, userNickname);
-    console.log('🏷️ 화자 매핑 완료');
-    
-    // 4. 통계 계산 (선택한 화자의 세그먼트만)
     const stats = calculateStats(mappedSegments, selectedSpeaker, userNickname);
-    console.log('📊 통계 계산 완료:', stats);
     
     return {
       segments: mappedSegments,
@@ -423,7 +356,6 @@ export const runFullAnalysis = async (
       }
     };
   } catch (error) {
-    console.error('❌ 전체 분석 플로우 실패:', error);
     throw new Error(`Analysis failed: ${error.message}`);
   }
 }; 

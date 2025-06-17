@@ -17,8 +17,6 @@ const AudioInput = ({ onComplete }: AudioInputProps) => {
   const [sessionId, setSessionId] = useState<string | null>(null);
 
   const handleRecordMode = async () => {
-    console.log('🎤 handleRecordMode 시작', { userName, participantCount });
-    
     if (!userName.trim()) {
       alert("Please enter your name first");
       return;
@@ -26,18 +24,12 @@ const AudioInput = ({ onComplete }: AudioInputProps) => {
 
     try {
       setIsRecordingLoading(true);
-      console.log('🔄 세션 초기화 시작...');
       
-      // 세션 초기화
       const sessionResponse = await api.initSession(userName, participantCount);
-      console.log('✅ 세션 초기화 성공:', sessionResponse);
-      
       setSessionId(sessionResponse.session_id);
       
-      console.log('🚀 onComplete 호출 중...');
       onComplete({ inputType: 'recording' }, userName, participantCount, sessionResponse.session_id);
     } catch (error) {
-      console.error('❌ Session initialization failed:', error);
       alert(handleApiError(error));
     } finally {
       setIsRecordingLoading(false);
@@ -45,18 +37,13 @@ const AudioInput = ({ onComplete }: AudioInputProps) => {
   };
 
   const handleFileUpload = async (file: File) => {
-    console.log('📁 handleFileUpload 시작', { fileName: file.name, fileSize: file.size, userName, participantCount });
-    
     if (!userName.trim()) {
       alert("Please enter your name first");
       return;
     }
 
-    // 파일 선택 즉시 로딩 상태로 전환하고 다음 화면으로 이동
     setIsUploadLoading(true);
-    console.log('🔄 파일 업로드 프로세스 시작...');
     
-    // 즉시 다음 화면으로 넘어가서 백그라운드에서 업로드 처리
     onComplete({ 
       inputType: 'file',
       file: file,
@@ -64,17 +51,10 @@ const AudioInput = ({ onComplete }: AudioInputProps) => {
       participantCount: participantCount,
       uploadPromise: (async () => {
         try {
-          // 1단계: 세션 초기화
-          console.log('1️⃣ 세션 초기화 중...');
           const sessionResponse = await api.initSession(userName, participantCount);
-          console.log('✅ 세션 초기화 성공:', sessionResponse);
-          
           setSessionId(sessionResponse.session_id);
           
-          // 2단계: 파일 업로드
-          console.log('2️⃣ 파일 업로드 중...');
           const uploadResponse = await api.uploadAudio(sessionResponse.session_id, file);
-          console.log('✅ 파일 업로드 성공:', uploadResponse);
           
           return {
             sessionId: sessionResponse.session_id,
@@ -82,7 +62,6 @@ const AudioInput = ({ onComplete }: AudioInputProps) => {
           };
           
         } catch (error) {
-          console.error('❌ File upload failed:', error);
           throw error;
         }
       })()
@@ -123,7 +102,6 @@ const AudioInput = ({ onComplete }: AudioInputProps) => {
   return (
     <div className="min-h-screen bg-white content-container">
       <div className="space-y-8 animate-slide-in-up">
-        {/* User Input Section */}
         <div className="premium-card p-6 md:p-8 space-y-6">
           <div className="text-center space-y-2">
             <h2 className="text-title text-foreground">Tell us about yourself</h2>
@@ -133,7 +111,6 @@ const AudioInput = ({ onComplete }: AudioInputProps) => {
           </div>
 
           <div className="space-y-6 max-w-md mx-auto">
-            {/* Name Input */}
             <div className="space-y-3">
               <label htmlFor="userName" className="text-sm font-medium text-gray-900 block">
                 Your Name
@@ -150,7 +127,6 @@ const AudioInput = ({ onComplete }: AudioInputProps) => {
               </div>
             </div>
 
-            {/* Participant Count */}
             <div className="space-y-3">
               <label htmlFor="participantCount" className="text-sm font-medium text-gray-900 block">
                 Number of Participants
@@ -187,9 +163,7 @@ const AudioInput = ({ onComplete }: AudioInputProps) => {
           </div>
         </div>
 
-        {/* Input Method Selection */}
         <div className="grid md:grid-cols-2 gap-6">
-          {/* Live Recording */}
           <div className="speaker-card space-y-6">
             <div className="text-center space-y-4">
               <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto">
@@ -211,7 +185,6 @@ const AudioInput = ({ onComplete }: AudioInputProps) => {
             </Button>
           </div>
 
-          {/* File Upload */}
           <div className="speaker-card space-y-6">
             <div className="text-center space-y-4">
               <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto">
@@ -225,7 +198,6 @@ const AudioInput = ({ onComplete }: AudioInputProps) => {
               </div>
             </div>
 
-            {/* Drop Zone */}
             <div
               className={`
                 border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300 cursor-pointer
@@ -277,7 +249,6 @@ const AudioInput = ({ onComplete }: AudioInputProps) => {
           </div>
         </div>
 
-        {/* Help Text */}
         <div className="text-center">
           <p className="text-body text-muted-foreground">
             Choose your preferred method to start analyzing your Korean pronunciation

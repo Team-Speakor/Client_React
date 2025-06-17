@@ -42,12 +42,10 @@ const Index = () => {
     if (data.inputType === 'recording') {
       setAppState('recording');
     } else {
-      // 파일 업로드: 즉시 로딩 화면으로 전환
       setProcessingMessage('Uploading file and initializing session...');
       setAppState('processing');
       
       try {
-        // 업로드 Promise 대기
         const uploadResult = await data.uploadPromise;
         
         setSessionId(uploadResult.sessionId);
@@ -58,13 +56,11 @@ const Index = () => {
           sessionId: uploadResult.sessionId
         });
         
-        // 업로드 완료 후 화자 분리 시작
         setProcessingMessage('Analyzing speakers and preparing for selection...');
         await api.diarizeAudio(uploadResult.sessionId);
         setAppState('speaker-selection');
         
       } catch (error) {
-        console.error('File upload or diarization failed:', error);
         alert(handleApiError(error));
         setAppState('input');
       }
@@ -77,18 +73,11 @@ const Index = () => {
     setAppState('processing');
     
     try {
-      // 녹음 파일이 있는 경우 업로드 먼저 실행
       if (data.audioFile && data.sessionId) {
-        console.log('📤 녹음 파일 업로드 시작...');
         const uploadResponse = await api.uploadAudio(data.sessionId, data.audioFile);
-        console.log('✅ 업로드 완료:', uploadResponse);
         
-        // 업로드 완료 후 화자 분리 실행
-        console.log('🔄 화자 분리 시작...');
         await api.diarizeAudio(data.sessionId);
-        console.log('✅ 화자 분리 완료');
         
-        // 데이터 업데이트
         setRecordedData({
           ...data,
           uploadResponse: uploadResponse,
@@ -98,7 +87,6 @@ const Index = () => {
       
       setAppState('speaker-selection');
     } catch (error) {
-      console.error('❌ Recording processing failed:', error);
       alert(handleApiError(error));
       setAppState('input');
     }
@@ -109,28 +97,18 @@ const Index = () => {
     setAppState('processing');
     
     try {
-      console.log('🎯 화자 선택 완료, 분석 플로우 시작:', { speakerId, userName, sessionId });
-      
-      // 1단계: 화자 선택 API 호출
-              setProcessingMessage('Selecting speaker and preparing analysis...');
+      setProcessingMessage('Selecting speaker and preparing analysis...');
       await api.selectSpeaker(sessionId, speakerId);
-      console.log('✅ 화자 선택 API 완료');
       
-      // Step 2: Sequential STT → LLM analysis
       const analysisResult = await runFullAnalysis(
         sessionId, 
         speakerId, 
         userName,
         (step, message) => {
-          // 진행률 업데이트 콜백
           setProcessingMessage(message);
-          console.log(`📈 진행률 업데이트: ${step} - ${message}`);
         }
       );
       
-      console.log('🎉 전체 분석 완료:', analysisResult);
-      
-      // 분석 결과 저장
       setAnalysisResults(analysisResult);
       setRecordedData({ 
         ...recordedData, 
@@ -142,7 +120,6 @@ const Index = () => {
       setAppState('results');
       
     } catch (error) {
-      console.error('❌ 화자 선택 또는 분석 실패:', error);
       alert(handleApiError(error));
       setAppState('speaker-selection');
     }

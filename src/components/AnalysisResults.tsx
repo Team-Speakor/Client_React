@@ -242,8 +242,8 @@ const AnalysisResults = ({ data, userName, selectedSpeaker, analysisResults, onS
           originalSegment: originalSegment
         });
       } else {
-        setSelectedSegment(item);
-      }
+      setSelectedSegment(item);
+    }
     }
   };
 
@@ -644,44 +644,44 @@ const AnalysisResults = ({ data, userName, selectedSpeaker, analysisResults, onS
                              (originalSegment && originalSegment.masked_text && originalSegment.masked_text.includes('[w]'));
             
             return (
-              <div
-                key={index}
-                className={`
+            <div
+              key={index}
+              className={`
                   premium-card p-6 border-l-4 transition-premium 
-                  ${getSpeakerStyle(item.speaker)}
+                ${getSpeakerStyle(item.speaker)}
                   ${selectedSegment?.text === item.text ? 'segment-highlight' : ''}
                   ${item.speaker === userName && hasErrors ? 'cursor-pointer hover:shadow-premium-lg' : ''}
-                `}
+              `}
                 onClick={() => handleSegmentClick(item, originalSegment)}
-              >
-                <div className="flex items-start space-x-4">
-                  <div className={`
-                    px-4 py-2 rounded-full text-sm font-medium min-w-fit
-                    ${getSpeakerBadgeStyle(item.speaker)}
-                  `}>
+            >
+              <div className="flex items-start space-x-4">
+                <div className={`
+                  px-4 py-2 rounded-full text-sm font-medium min-w-fit
+                  ${getSpeakerBadgeStyle(item.speaker)}
+                `}>
                     {item.speaker}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-body leading-relaxed text-gray-900">
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-body leading-relaxed text-gray-900">
                       {renderTextWithErrors(item, originalSegment)}
-                    </p>
+                  </p>
                     {(hasErrors) && (
-                      <div className="flex items-center justify-between mt-4">
-                        <p className="text-sm text-gray-700 flex items-center font-medium">
-                          <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
+                    <div className="flex items-center justify-between mt-4">
+                      <p className="text-sm text-gray-700 flex items-center font-medium">
+                        <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
                           {originalSegment && originalSegment.masked_text ? 
                             (() => {
                               const errorCount = countErrorWordsFromMaskedText(originalSegment.correct_text, originalSegment.masked_text);
                               return `${errorCount} pronunciation ${errorCount === 1 ? 'error' : 'errors'} detected`;
                             })() :
                             `${item.errors?.length || 0} pronunciation ${(item.errors?.length || 0) === 1 ? 'error' : 'errors'} detected`}
-                        </p>
-                        <ChevronRight className="w-4 h-4 text-gray-500" />
-                      </div>
-                    )}
-                  </div>
+                      </p>
+                      <ChevronRight className="w-4 h-4 text-gray-500" />
+                    </div>
+                  )}
                 </div>
               </div>
+            </div>
             );
           })}
         </div>

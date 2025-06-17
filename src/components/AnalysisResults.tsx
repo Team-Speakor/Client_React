@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Play, Pause, RotateCcw, Eye, EyeOff, ChevronRight } from "lucide-react";
 import FeedbackPanel from "./FeedbackPanel";
+import { LLMSegment, extractErrorWords } from "@/utils/api";
 
 interface Error {
   word: string;
@@ -15,28 +16,62 @@ interface TranscriptItem {
   errors: Error[];
 }
 
+// 실제 API 세그먼트를 UI용 TranscriptItem으로 변환하는 함수
+const convertSegmentToTranscript = (segment: LLMSegment & { display_name?: string }): TranscriptItem => {
+  const errorWords = extractErrorWords(segment.correct_text, segment.masked_text);
+  
+  return {
+    speaker: segment.display_name || segment.speaker_name,
+    text: segment.correct_text,
+    errors: errorWords.map(error => ({
+      word: error.word,
+      position: error.position,
+      suggestion: segment.improvement_tips || 'Pronunciation needs improvement'
+    }))
+  };
+};
+
 interface AnalysisResultsProps {
   data: {
     transcript?: TranscriptItem[];
     audioFile?: File;
     uploadResponse?: any;
+    segments?: (LLMSegment & { display_name?: string })[];
+    stats?: {
+      segmentAccuracy: number;
+      perfectSegments: number;
+      totalErrors: number;
+      totalSegments: number;
+    };
   };
   userName: string;
   selectedSpeaker: string;
+  analysisResults?: {
+    segments: (LLMSegment & { display_name?: string })[];
+    stats: {
+      segmentAccuracy: number;
+      perfectSegments: number;
+      totalErrors: number;
+      totalSegments: number;
+    };
+  };
   onStartOver: () => void;
 }
 
-const AnalysisResults = ({ data, userName, selectedSpeaker, onStartOver }: AnalysisResultsProps) => {
-  const [selectedSegment, setSelectedSegment] = useState<TranscriptItem | null>(null);
+const AnalysisResults = ({ data, userName, selectedSpeaker, analysisResults, onStartOver }: AnalysisResultsProps) => {
+  const [selectedSegment, setSelectedSegment] = useState<any>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showAllFeedback, setShowAllFeedback] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
 
-  // Mock transcript with Korean examples if no real data
+  // 실제 분석 결과 사용 여부 결정
+  const useRealData = analysisResults && analysisResults.segments && analysisResults.segments.length > 0;
+
+  // Mock transcript with Korean examples for fallback
   const mockTranscript: TranscriptItem[] = [
     {
-      speaker: 'user',
+      speaker: userName || 'user',
       text: '안녕하세요, 저는 한국어를 배우고 있습니다.',
       errors: [
         { word: '한국어를', position: 3, suggestion: 'Pronunciation needs improvement' },
@@ -44,25 +79,46 @@ const AnalysisResults = ({ data, userName, selectedSpeaker, onStartOver }: Analy
       ]
     },
     {
-      speaker: 'speaker1',
+      speaker: 'Speaker 1',
       text: '안녕하세요. 만나서 반갑습니다. 천천히 연습해보세요.',
       errors: []
     },
     {
-      speaker: 'user',
+      speaker: userName || 'user',
       text: '감사합니다. 도움을 주셔서 정말 고맙습니다.',
       errors: [
         { word: '감사합니다', position: 0, suggestion: 'Pronunciation needs improvement' }
       ]
     },
     {
-      speaker: 'speaker2',
+      speaker: 'Speaker 2',
       text: '천천히 하세요! 계속 연습하시면 됩니다.',
       errors: []
     }
   ];
 
-  const transcript = data?.transcript && data.transcript.length > 0 ? data.transcript : mockTranscript;
+  // 실제 데이터 또는 Mock 데이터 사용
+  let transcript: TranscriptItem[] = [];
+  let stats = {
+    segmentAccuracy: 85,
+    perfectSegments: 2,
+    totalErrors: 3,
+    totalSegments: 4
+  };
+
+  if (useRealData) {
+    console.log('📊 실제 분석 데이터 사용:', analysisResults);
+    
+    // API 세그먼트를 UI용 transcript로 변환
+    transcript = analysisResults.segments.map(convertSegmentToTranscript);
+    stats = analysisResults.stats;
+    
+    console.log('📋 변환된 transcript:', transcript);
+    console.log('📈 통계 데이터:', stats);
+  } else {
+    console.log('⚠️ Mock 데이터 사용 (실제 분석 결과 없음)');
+    transcript = data?.transcript && data.transcript.length > 0 ? data.transcript : mockTranscript;
+  }
 
   // 오디오 URL 생성 및 정리
   useEffect(() => {
@@ -135,50 +191,74 @@ const AnalysisResults = ({ data, userName, selectedSpeaker, onStartOver }: Analy
     }
   };
 
-  const getSpeakerLabel = (speaker: string) => {
-    if (speaker === 'user') return userName;
-    if (speaker === 'speaker1') return 'Speaker 1';
-    if (speaker === 'speaker2') return 'Speaker 2';
-    if (speaker === 'speaker3') return 'Speaker 3';
-    return `Speaker ${speaker.replace('speaker', '')}`;
-  };
-
   const getSpeakerStyle = (speaker: string) => {
-    if (speaker === 'user') {
+    if (speaker === userName) {
       return 'bg-blue-50 border-l-blue-500';
     }
     
-    const otherStyles = {
-      'speaker1': 'bg-green-50 border-l-green-500',
-      'speaker2': 'bg-purple-50 border-l-purple-500',
-      'speaker3': 'bg-orange-50 border-l-orange-500',
-    };
+    if (speaker.startsWith('Speaker')) {
+      const speakerNum = parseInt(speaker.split(' ')[1]) || 1;
+      const styles = [
+        'bg-green-50 border-l-green-500',
+        'bg-purple-50 border-l-purple-500',
+        'bg-orange-50 border-l-orange-500',
+        'bg-pink-50 border-l-pink-500'
+      ];
+      return styles[(speakerNum - 1) % styles.length];
+    }
     
-    return otherStyles[speaker as keyof typeof otherStyles] || 'bg-gray-50 border-l-gray-400';
+    return 'bg-gray-50 border-l-gray-400';
   };
 
   const getSpeakerBadgeStyle = (speaker: string) => {
-    if (speaker === 'user') {
+    if (speaker === userName) {
       return 'bg-blue-600 text-white font-semibold';
     }
     
-    const badgeStyles = {
-      'speaker1': 'bg-green-600 text-white font-medium',
-      'speaker2': 'bg-purple-600 text-white font-medium', 
-      'speaker3': 'bg-orange-600 text-white font-medium',
-    };
+    if (speaker.startsWith('Speaker')) {
+      const speakerNum = parseInt(speaker.split(' ')[1]) || 1;
+      const styles = [
+        'bg-green-600 text-white font-medium',
+        'bg-purple-600 text-white font-medium', 
+        'bg-orange-600 text-white font-medium',
+        'bg-pink-600 text-white font-medium'
+      ];
+      return styles[(speakerNum - 1) % styles.length];
+    }
     
-    return badgeStyles[speaker as keyof typeof badgeStyles] || 'bg-gray-600 text-white font-medium';
+    return 'bg-gray-600 text-white font-medium';
   };
 
-  const handleSegmentClick = (item: TranscriptItem) => {
-    if (item.speaker === 'user' && item.errors && item.errors.length > 0) {
-      setSelectedSegment(item);
+  const handleSegmentClick = (item: TranscriptItem, originalSegment?: LLMSegment) => {
+    // 사용자 세그먼트이고, 에러가 있거나 원본 세그먼트에 마스킹된 텍스트([w])가 있는 경우
+    const hasErrors = (item.errors && item.errors.length > 0) || 
+                     (originalSegment && originalSegment.masked_text && originalSegment.masked_text.includes('[w]'));
+    
+    if (item.speaker === userName && hasErrors) {
+      // 실제 API 데이터가 있으면 상세 정보와 함께 전달
+      if (originalSegment) {
+        setSelectedSegment({
+          ...item,
+          originalSegment: originalSegment
+        });
+      } else {
+        setSelectedSegment(item);
+      }
     }
   };
 
-  const renderTextWithErrors = (item: TranscriptItem) => {
-    if (item.speaker !== 'user' || !item.errors || item.errors.length === 0) {
+  const renderTextWithErrors = (item: TranscriptItem, originalSegment?: LLMSegment) => {
+    if (item.speaker !== userName) {
+      return item.text;
+    }
+
+    // 실제 API 데이터가 있는 경우 masked_text를 사용하여 렌더링
+    if (originalSegment && originalSegment.masked_text && originalSegment.correct_text) {
+      return renderTextWithMaskedErrors(originalSegment.correct_text, originalSegment.masked_text);
+    }
+
+    // 기존 fallback: errors 배열 사용
+    if (!item.errors || item.errors.length === 0) {
       return item.text;
     }
 
@@ -191,7 +271,12 @@ const AnalysisResults = ({ data, userName, selectedSpeaker, onStartOver }: Analy
           <span
             key={index}
             className="error-word"
-            onClick={() => handleSegmentClick(item)}
+            onClick={() => {
+              // 실제 API 데이터에서 해당 세그먼트 찾기
+              const originalSegment = useRealData ? 
+                analysisResults?.segments.find(s => s.correct_text === item.text) : undefined;
+              handleSegmentClick(item, originalSegment);
+            }}
           >
             {word}
           </span>
@@ -205,12 +290,224 @@ const AnalysisResults = ({ data, userName, selectedSpeaker, onStartOver }: Analy
     }, [] as React.ReactNode[]);
   };
 
-  const userSegments = transcript.filter(item => item.speaker === 'user');
-  const totalSegments = userSegments.length;
-  const perfectSegments = userSegments.filter(item => !item.errors || item.errors.length === 0).length;
-  const segmentAccuracy = totalSegments > 0 ? Math.round((perfectSegments / totalSegments) * 100) : 100;
+    // correct_text와 masked_text에서 실제 에러 단어 개수를 계산하는 함수
+  const countErrorWordsFromMaskedText = (correctText: string, maskedText: string): number => {
+    // maskedText를 분석하여 [w] 위치 파악
+    let maskedParts = [];
+    let tempMasked = maskedText;
+    
+    // [w] 패턴 전까지의 텍스트와 [w] 개수 추출
+    while (tempMasked.length > 0) {
+      const wIndex = tempMasked.indexOf('[w]');
+      if (wIndex === -1) {
+        maskedParts.push({ text: tempMasked, isError: false });
+        break;
+      }
+      
+      if (wIndex > 0) {
+        maskedParts.push({ text: tempMasked.substring(0, wIndex), isError: false });
+      }
+      
+      let errorCount = 0;
+      let pos = wIndex;
+      while (pos < tempMasked.length && tempMasked.substring(pos, pos + 3) === '[w]') {
+        errorCount++;
+        pos += 3;
+      }
+      
+      maskedParts.push({ text: '', isError: true, errorCount });
+      tempMasked = tempMasked.substring(pos);
+    }
+    
+    // correctText를 분할하여 실제 에러 단어 개수 계산
+    let correctPos = 0;
+    let totalErrorWords = 0;
+    
+    for (let i = 0; i < maskedParts.length; i++) {
+      const part = maskedParts[i];
+      
+      if (!part.isError) {
+        const normalText = part.text;
+        correctPos += normalText.length;
+      } else {
+        let errorText = '';
+        
+        let nextNormalText = '';
+        if (i + 1 < maskedParts.length && !maskedParts[i + 1].isError) {
+          nextNormalText = maskedParts[i + 1].text;
+        }
+        
+        if (nextNormalText) {
+          const nextPos = correctText.indexOf(nextNormalText, correctPos);
+          if (nextPos !== -1) {
+            errorText = correctText.substring(correctPos, nextPos);
+            correctPos = nextPos;
+          }
+        } else {
+          errorText = correctText.substring(correctPos);
+          correctPos = correctText.length;
+        }
+        
+        // 에러 텍스트에서 실제 단어 개수 계산 (공백으로 분리)
+        if (errorText.trim()) {
+          const errorWords = errorText.trim().split(/\s+/).filter(word => word.length > 0);
+          totalErrorWords += errorWords.length;
+        }
+      }
+    }
+    
+    return totalErrorWords;
+  };
 
-  const totalErrors = userSegments.reduce((sum, item) => sum + (item.errors?.length || 0), 0);
+  // correct_text와 masked_text를 비교해서 [w] 마스킹된 부분만 스타일링하는 함수
+  const renderTextWithMaskedErrors = (correctText: string, maskedText: string) => {
+    console.log('🔍 텍스트 비교:', { correctText, maskedText });
+    
+    // 간단한 방법: maskedText에서 [w] 패턴 찾아서 해당하는 부분을 correctText에서 식별
+    // 예: "네, 알겠습니다." vs "네, 알겠습[w][w]."
+    
+    // maskedText를 분석하여 [w] 위치 파악
+    let maskedParts = [];
+    let tempMasked = maskedText;
+    let currentPos = 0;
+    
+    // [w] 패턴 전까지의 텍스트와 [w] 개수 추출
+    while (tempMasked.length > 0) {
+      const wIndex = tempMasked.indexOf('[w]');
+      if (wIndex === -1) {
+        // 더 이상 [w]가 없음
+        maskedParts.push({ text: tempMasked, isError: false });
+        break;
+      }
+      
+      // [w] 이전 텍스트
+      if (wIndex > 0) {
+        maskedParts.push({ text: tempMasked.substring(0, wIndex), isError: false });
+      }
+      
+      // 연속된 [w] 개수 세기
+      let errorCount = 0;
+      let pos = wIndex;
+      while (pos < tempMasked.length && tempMasked.substring(pos, pos + 3) === '[w]') {
+        errorCount++;
+        pos += 3;
+      }
+      
+      maskedParts.push({ text: '', isError: true, errorCount });
+      tempMasked = tempMasked.substring(pos);
+    }
+    
+    console.log('📝 마스킹 분석:', maskedParts);
+    
+    // correctText를 maskedParts에 맞춰 분할
+    let result: React.ReactNode[] = [];
+    let correctPos = 0;
+    
+    for (let i = 0; i < maskedParts.length; i++) {
+      const part = maskedParts[i];
+      
+      if (!part.isError) {
+        // 정상 텍스트 - 그대로 사용
+        const normalText = part.text;
+        result.push(<span key={i}>{normalText}</span>);
+        correctPos += normalText.length;
+      } else {
+        // 에러 부분 - correctText에서 다음 정상 텍스트까지의 모든 문자를 에러로 처리
+        let errorText = '';
+        
+        // 다음 정상 텍스트 찾기
+        let nextNormalText = '';
+        if (i + 1 < maskedParts.length && !maskedParts[i + 1].isError) {
+          nextNormalText = maskedParts[i + 1].text;
+        }
+        
+        if (nextNormalText) {
+          // 다음 정상 텍스트가 나오는 위치까지의 모든 문자
+          const nextPos = correctText.indexOf(nextNormalText, correctPos);
+          if (nextPos !== -1) {
+            errorText = correctText.substring(correctPos, nextPos);
+            correctPos = nextPos;
+          }
+        } else {
+          // 마지막 에러 부분 - 끝까지
+          errorText = correctText.substring(correctPos);
+          correctPos = correctText.length;
+        }
+        
+        if (errorText) {
+          result.push(
+            <span
+              key={i}
+              className="error-word"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {errorText}
+            </span>
+          );
+        }
+      }
+    }
+    
+    console.log('✅ 렌더링 결과:', result);
+    return result;
+  };
+
+  // 사용자 세그먼트만 필터링하여 통계 계산
+  const userSegments = transcript.filter(item => item.speaker === userName);
+  const totalUserSegments = userSegments.length;
+  
+  // 실제 API 데이터가 있는 경우 더 정확한 계산
+  let perfectUserSegments = 0;
+  let totalUserErrors = 0;
+  
+  if (useRealData && analysisResults?.segments) {
+    // 실제 API 세그먼트에서 사용자 세그먼트만 필터링
+    const userApiSegments = analysisResults.segments.filter(segment => 
+      segment.display_name === userName || segment.speaker_name === userName
+    );
+    
+    for (const segment of userApiSegments) {
+      // masked_text에 [w]가 없으면 완벽한 세그먼트
+      const hasErrors = segment.masked_text && segment.masked_text.includes('[w]');
+      if (!hasErrors) {
+        perfectUserSegments++;
+      } else {
+        // 실제 에러 단어 개수 계산
+        const errorCount = countErrorWordsFromMaskedText(segment.correct_text, segment.masked_text);
+        totalUserErrors += errorCount;
+      }
+    }
+  } else {
+    // Mock 데이터 사용
+    perfectUserSegments = userSegments.filter(item => !item.errors || item.errors.length === 0).length;
+    totalUserErrors = userSegments.reduce((sum, item) => sum + (item.errors?.length || 0), 0);
+  }
+  
+  const userSegmentAccuracy = totalUserSegments > 0 ? Math.round((perfectUserSegments / totalUserSegments) * 100) : 100;
+
+  // 실제 API 통계가 있으면 계산된 값 사용, 없으면 fallback
+  const displayStats = useRealData ? {
+    segmentAccuracy: userSegmentAccuracy,
+    perfectSegments: perfectUserSegments,
+    totalErrors: totalUserErrors,
+    totalSegments: totalUserSegments
+  } : {
+    segmentAccuracy: userSegmentAccuracy,
+    perfectSegments: perfectUserSegments,
+    totalErrors: totalUserErrors,
+    totalSegments: totalUserSegments
+  };
+  
+  // 디버깅용 로그
+  console.log('📊 AnalysisResults 통계 디버깅:', {
+    useRealData,
+    userName,
+    totalTranscriptItems: transcript.length,
+    userSegmentsFromTranscript: userSegments.length,
+    statsFromAPI: useRealData ? stats : null,
+    displayStats,
+    userSegments: userSegments.map(s => ({ speaker: s.speaker, text: s.text.substring(0, 20) }))
+  });
 
   if (!transcript.length) {
     return (
@@ -251,6 +548,7 @@ const AnalysisResults = ({ data, userName, selectedSpeaker, onStartOver }: Analy
               <p className="text-body text-gray-700">
                 Pronunciation analysis for <span className="font-semibold text-blue-600">{userName}</span>
               </p>
+
             </div>
             
             <div className="flex flex-col gap-3">
@@ -309,19 +607,19 @@ const AnalysisResults = ({ data, userName, selectedSpeaker, onStartOver }: Analy
           {/* Enhanced Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             <div className="bg-white rounded-lg p-4 text-center border border-gray-200">
-              <div className="text-2xl font-semibold text-gray-900">{segmentAccuracy}%</div>
+              <div className="text-2xl font-semibold text-gray-900">{displayStats.segmentAccuracy}%</div>
               <div className="text-caption text-gray-600">Segment Accuracy</div>
             </div>
             <div className="bg-white rounded-lg p-4 text-center border border-gray-200">
-              <div className="text-2xl font-semibold text-gray-900">{perfectSegments}/{totalSegments}</div>
+              <div className="text-2xl font-semibold text-gray-900">{displayStats.perfectSegments}/{displayStats.totalSegments}</div>
               <div className="text-caption text-gray-600">Perfect Segments</div>
             </div>
             <div className="bg-white rounded-lg p-4 text-center border border-gray-200">
-              <div className="text-2xl font-semibold text-red-500">{totalErrors}</div>
+              <div className="text-2xl font-semibold text-red-500">{displayStats.totalErrors}</div>
               <div className="text-caption text-gray-600">Total Errors</div>
             </div>
             <div className="bg-white rounded-lg p-4 text-center border border-gray-200">
-              <div className="text-2xl font-semibold text-gray-900">{totalSegments}</div>
+              <div className="text-2xl font-semibold text-gray-900">{displayStats.totalSegments}</div>
               <div className="text-caption text-gray-600">Your Segments</div>
             </div>
           </div>
@@ -329,48 +627,63 @@ const AnalysisResults = ({ data, userName, selectedSpeaker, onStartOver }: Analy
           {/* Help Text */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <p className="text-body text-blue-800">
-              💡 Click on any segment with errors to see detailed pronunciation feedback and improvement tips.
+              💡 Click on any highlighted word with errors to see detailed pronunciation feedback and improvement tips.
             </p>
           </div>
         </div>
 
         {/* Conversation Transcript */}
         <div className="space-y-4">
-          {transcript.map((item, index) => (
-            <div
-              key={index}
-              className={`
-                premium-card p-6 border-l-4 transition-premium cursor-pointer
-                ${getSpeakerStyle(item.speaker)}
-                ${selectedSegment === item ? 'segment-highlight' : ''}
-                ${item.speaker === 'user' && item.errors && item.errors.length > 0 ? 'hover:shadow-premium-lg' : ''}
-              `}
-              onClick={() => handleSegmentClick(item)}
-            >
-              <div className="flex items-start space-x-4">
-                <div className={`
-                  px-4 py-2 rounded-full text-sm font-medium min-w-fit
-                  ${getSpeakerBadgeStyle(item.speaker)}
-                `}>
-                  {getSpeakerLabel(item.speaker)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-body leading-relaxed text-gray-900">
-                    {renderTextWithErrors(item)}
-                  </p>
-                  {item.errors && item.errors.length > 0 && (
-                    <div className="flex items-center justify-between mt-4">
-                      <p className="text-sm text-gray-700 flex items-center font-medium">
-                        <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
-                        {item.errors.length} pronunciation {item.errors.length === 1 ? 'error' : 'errors'} detected
-                      </p>
-                      <ChevronRight className="w-4 h-4 text-gray-500" />
-                    </div>
-                  )}
+          {transcript.map((item, index) => {
+            // 실제 API 데이터에서 원본 세그먼트 찾기
+            const originalSegment = useRealData ? 
+              analysisResults?.segments.find(s => s.correct_text === item.text) : undefined;
+            
+            // 클릭 가능한 조건 (에러가 있거나 마스킹된 텍스트가 있는 경우)
+            const hasErrors = (item.errors && item.errors.length > 0) || 
+                             (originalSegment && originalSegment.masked_text && originalSegment.masked_text.includes('[w]'));
+            
+            return (
+              <div
+                key={index}
+                className={`
+                  premium-card p-6 border-l-4 transition-premium 
+                  ${getSpeakerStyle(item.speaker)}
+                  ${selectedSegment?.text === item.text ? 'segment-highlight' : ''}
+                  ${item.speaker === userName && hasErrors ? 'cursor-pointer hover:shadow-premium-lg' : ''}
+                `}
+                onClick={() => handleSegmentClick(item, originalSegment)}
+              >
+                <div className="flex items-start space-x-4">
+                  <div className={`
+                    px-4 py-2 rounded-full text-sm font-medium min-w-fit
+                    ${getSpeakerBadgeStyle(item.speaker)}
+                  `}>
+                    {item.speaker}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-body leading-relaxed text-gray-900">
+                      {renderTextWithErrors(item, originalSegment)}
+                    </p>
+                    {(hasErrors) && (
+                      <div className="flex items-center justify-between mt-4">
+                        <p className="text-sm text-gray-700 flex items-center font-medium">
+                          <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
+                          {originalSegment && originalSegment.masked_text ? 
+                            (() => {
+                              const errorCount = countErrorWordsFromMaskedText(originalSegment.correct_text, originalSegment.masked_text);
+                              return `${errorCount} pronunciation ${errorCount === 1 ? 'error' : 'errors'} detected`;
+                            })() :
+                            `${item.errors?.length || 0} pronunciation ${(item.errors?.length || 0) === 1 ? 'error' : 'errors'} detected`}
+                        </p>
+                        <ChevronRight className="w-4 h-4 text-gray-500" />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* All Feedback Summary Panel */}
@@ -381,17 +694,29 @@ const AnalysisResults = ({ data, userName, selectedSpeaker, onStartOver }: Analy
             </h3>
             <div className="space-y-4">
               {userSegments
-                .filter(item => item.errors && item.errors.length > 0)
+                .filter(item => {
+                  const originalSegment = useRealData ? 
+                    analysisResults?.segments.find(s => s.correct_text === item.text) : undefined;
+                  return (item.errors && item.errors.length > 0) || 
+                         (originalSegment && originalSegment.masked_text && originalSegment.masked_text.includes('[w]'));
+                })
                 .map((item, segmentIndex) => (
                   <div
                     key={segmentIndex}
                     className="premium-card p-4 cursor-pointer hover:shadow-premium transition-premium border border-gray-200"
-                    onClick={() => setSelectedSegment(item)}
+                    onClick={() => {
+                      const originalSegment = useRealData ? 
+                        analysisResults?.segments.find(s => s.correct_text === item.text) : undefined;
+                      setSelectedSegment({
+                        ...item,
+                        originalSegment: originalSegment
+                      });
+                    }}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <p className="text-body font-semibold text-gray-900 mb-2">
-                          Segment {segmentIndex + 1}: "{item.text.substring(0, 50)}..."
+                          "{item.text.substring(0, 50)}..."
                         </p>
                         <div className="flex flex-wrap gap-2">
                           {item.errors?.map((error, errorIndex) => (

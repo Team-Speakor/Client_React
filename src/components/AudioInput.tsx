@@ -52,36 +52,41 @@ const AudioInput = ({ onComplete }: AudioInputProps) => {
       return;
     }
 
-    try {
-      setIsUploadLoading(true);
-      console.log('🔄 파일 업로드 프로세스 시작...');
-      
-      // 1단계: 세션 초기화
-      console.log('1️⃣ 세션 초기화 중...');
-      const sessionResponse = await api.initSession(userName, participantCount);
-      console.log('✅ 세션 초기화 성공:', sessionResponse);
-      
-      setSessionId(sessionResponse.session_id);
-      
-      // 2단계: 파일 업로드
-      console.log('2️⃣ 파일 업로드 중...');
-      const uploadResponse = await api.uploadAudio(sessionResponse.session_id, file);
-      console.log('✅ 파일 업로드 성공:', uploadResponse);
-      
-      // 업로드 성공 시 다음 단계로 진행
-      console.log('🚀 onComplete 호출 중...');
-      onComplete({ 
-        inputType: 'file',
-        file: file,
-        uploadResponse: uploadResponse,
-        sessionId: sessionResponse.session_id
-      }, userName, participantCount, sessionResponse.session_id);
-      
-    } catch (error) {
-      console.error('❌ File upload failed:', error);
-      alert(handleApiError(error));
-      setIsUploadLoading(false);
-    }
+    // 파일 선택 즉시 로딩 상태로 전환하고 다음 화면으로 이동
+    setIsUploadLoading(true);
+    console.log('🔄 파일 업로드 프로세스 시작...');
+    
+    // 즉시 다음 화면으로 넘어가서 백그라운드에서 업로드 처리
+    onComplete({ 
+      inputType: 'file',
+      file: file,
+      userName: userName,
+      participantCount: participantCount,
+      uploadPromise: (async () => {
+        try {
+          // 1단계: 세션 초기화
+          console.log('1️⃣ 세션 초기화 중...');
+          const sessionResponse = await api.initSession(userName, participantCount);
+          console.log('✅ 세션 초기화 성공:', sessionResponse);
+          
+          setSessionId(sessionResponse.session_id);
+          
+          // 2단계: 파일 업로드
+          console.log('2️⃣ 파일 업로드 중...');
+          const uploadResponse = await api.uploadAudio(sessionResponse.session_id, file);
+          console.log('✅ 파일 업로드 성공:', uploadResponse);
+          
+          return {
+            sessionId: sessionResponse.session_id,
+            uploadResponse: uploadResponse
+          };
+          
+        } catch (error) {
+          console.error('❌ File upload failed:', error);
+          throw error;
+        }
+      })()
+    }, userName, participantCount);
   };
 
   const handleDrop = (e: React.DragEvent) => {

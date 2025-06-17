@@ -220,10 +220,10 @@ Content-Type: application/json
 **상태:** `'results'` (Index.tsx)  
 **컴포넌트:** `AnalysisResults.tsx`
 
-#### 🔗 API 연동:
-**음성 분석 및 결과 요청**
+#### 🔗 API 연동 순서:
+**1단계: STT (Speech-to-Text) 분석**
 ```http
-POST /api/inference
+POST /api/inference/stt
 Content-Type: application/json
 
 {
@@ -231,64 +231,203 @@ Content-Type: application/json
 }
 ```
 
-**현재 응답:**
-```json
-null
-```
-
-**⚠️ 현재 상태:** 
-- API가 `null` 응답 반환 (아직 구현 미완료)
-- 현재는 Mock 데이터로 결과 화면 표시
-
-**예상 응답 구조 (구현 예정):**
+**응답:**
 ```json
 {
-  "transcript": [
-    {
-      "speaker": "user",
-      "text": "안녕하세요, 저는 한국어를 배우고 있습니다.",
-      "errors": [
-        {
-          "word": "한국어를",
-          "position": 2,
-          "suggestion": "발음 개선 필요",
-          "ipa": "[han.ɡu.ɡʌ.ɾɯl]",
-          "confidence": 0.75
-        }
-      ]
-    }
-  ],
-  "overall_score": 85,
-  "total_errors": 3
+  "message": "STT inference completed. Transcriptions saved to .json files."
 }
 ```
 
-#### 제공 기능:
-1. **전체 통계**:
-   - 세그먼트 정확도 (Segment Accuracy)
-   - 완벽한 세그먼트 수 (Perfect Segments)
-   - 총 오류 수 (Total Errors)
-   - 총 세그먼트 수 (Total Segments)
+**2단계: LLM 기반 발음 분석**
+```http
+POST /api/inference/llm
+Content-Type: application/json
 
-2. **상호작용 버튼**:
-   - **전체 녹음 재생**: "Play Recording" 버튼
-   - **모든 피드백 보기**: "View All Feedback" 버튼
-   - **처음부터 시작**: "Start Over" 버튼
+{
+  "session_id": "8174cf77-c3ea-4f40-845b-f91f9fcde421"
+}
+```
 
-3. **대화 내용 분석**:
-   - 화자별 대화 내용 표시
-   - 발음 오류 단어 하이라이트 (빨간색)
-   - 오류 단어 클릭 시 상세 피드백 모달
+**응답 구조:**
+```json
+{
+  "message": "LLM inference completed.",
+  "final_response": [
+    {
+      "segment_id": 1,
+      "speaker_name": "SPEAKER_00",
+      "correct_text": "음, 우리 마트 갈까?",
+      "masked_text": "[w], [w][w] [w][w] [w][w]?",
+      "correct_ipa": "/ɯm/ /uɾi/ /maɾtɯ/ /kal.k͈a/",
+      "improvement_tips": "\"Pronounce 'um' with a short, relaxed 'uh' sound.\", \"Make 'u' in 'uri' sound like 'oo' in 'food'.\", \"Soften 'gal' in 'gal-kkah' but emphasize the final 'k' sound crisply.\"",
+      "common_mistakes": "\"Replacing the final vowel sound in '마트' with a short 'a' sound, making it sound like '맛'\", \"Omitting the final consonant 'ㄲ' in '갈까' and replacing it with 'ㄹ' sound\"",
+      "focus_areas": "\"Proper consonant articulation\", \"Correct vowel length and quality\", \"Accurate final consonant pronunciation\"",
+      "practice_tips": "\"Focus on distinguishing vowel sounds like ㅡ (eu) and ㅏ (a)\", \"Practice the ㄹ (r/l) and ㄹ 받침 sounds by repeating minimal pairs\", \"Listen and mimic native speakers asking questions intonation\""
+    }
+    // ... 더 많은 세그먼트들
+  ]
+}
+```
 
-#### 상세 피드백 모달:
-- **개선 팁 (Improvement Tips)**
-- **일반적인 실수 (Common Mistakes)**
-- **연습 가이드 (Practice Exercise)**
-- **IPA 발음 기호**
+#### 🎯 **핵심 구현 로직:**
+
+**A. 화자 이름 매핑:**
+- `/api/session/init`에서 받은 `nickname` = 사용자가 입력한 이름
+- `/api/speaker/select`에서 선택한 `speaker` (예: "SPEAKER_00") = 사용자의 음성
+- `final_response`에서 `speaker_name`이 선택한 speaker와 동일하면 → 사용자 이름으로 표시
+- 다른 speaker들은 "Speaker 1", "Speaker 2" 등으로 표시
+
+**B. 데이터 처리 순서:**
+1. **화자 선택 완료 후 → STT 호출**
+2. **STT 완료 응답 받으면 → LLM 호출**
+3. **LLM 응답 받으면 → 결과 페이지 표시**
+
+**C. 로딩 상태 관리:**
+- 화자 선택 → "음성을 텍스트로 변환 중..." (STT 진행)
+- STT 완료 → "발음 분석 중..." (LLM 진행) 
+- LLM 완료 → 결과 표시
+
+#### 📊 **결과 페이지 데이터 구성:**
+
+**1. 전체 통계 계산:**
+```typescript
+// 통계 계산 로직 (코드 구현 시 참고)
+const calculateStats = (segments: Segment[]) => {
+  const totalSegments = segments.length;
+  const segmentsWithErrors = segments.filter(s => s.masked_text.includes('[w]')).length;
+  const perfectSegments = totalSegments - segmentsWithErrors;
+  const totalErrors = segments.reduce((acc, s) => {
+    return acc + (s.masked_text.match(/\[w\]/g) || []).length;
+  }, 0);
+  
+  const segmentAccuracy = Math.round((perfectSegments / totalSegments) * 100);
+  
+  return {
+    segmentAccuracy,
+    perfectSegments,
+    totalErrors,
+    totalSegments
+  };
+};
+```
+
+**2. 화자별 대화 표시:**
+- `segment_id` 순서대로 대화 내용 표시
+- `speaker_name`을 사용자 이름 또는 "Speaker X"로 변환
+- `correct_text`를 기본 텍스트로 표시
+- `masked_text`에서 `[w]` 있는 단어는 빨간색으로 하이라이트
+
+**3. 상세 피드백 모달:**
+- 오류 단어 클릭 시 해당 세그먼트의 상세 정보 표시:
+  - `improvement_tips`
+  - `common_mistakes`  
+  - `focus_areas`
+  - `practice_tips`
+  - `correct_ipa`
+
+#### ⚠️ **데이터 품질 이슈 및 처리 방안:**
+
+**A. 현재 알려진 이슈:**
+- 일부 세그먼트에서 빈 값들 (`""`) 존재
+- `[ERROR]` 태그가 포함된 세그먼트 존재
+- `[unk]` 태그가 일부 텍스트에 포함
+
+**B. 데이터 정제 로직:**
+```typescript
+// 구현 시 참고할 데이터 정제 로직
+const cleanSegmentData = (segments: Segment[]) => {
+  return segments.filter(segment => {
+    // 빈 데이터나 ERROR가 있는 세그먼트 제외
+    return segment.correct_text && 
+           segment.correct_text !== "[ERROR]" && 
+           segment.correct_text.trim() !== "";
+  }).map(segment => ({
+    ...segment,
+    // [unk] 태그 제거
+    correct_text: segment.correct_text.replace(/\[unk\]/g, ''),
+    // 빈 필드들에 기본값 설정
+    improvement_tips: segment.improvement_tips || "개선 팁이 준비 중입니다.",
+    common_mistakes: segment.common_mistakes || "일반적인 실수 분석이 준비 중입니다.",
+    focus_areas: segment.focus_areas || "집중 학습 영역이 준비 중입니다.",
+    practice_tips: segment.practice_tips || "연습 방법이 준비 중입니다."
+  }));
+};
+```
+
+#### 🔄 **API 호출 플로우 상세:**
+
+```
+화자 선택 페이지 완료
+    ↓
+setAppState('processing') + "음성을 텍스트로 변환 중..."
+    ↓
+POST /api/inference/stt
+    ↓ (성공 응답 대기)
+"발음 분석 중..." 메시지 변경
+    ↓
+POST /api/inference/llm  
+    ↓ (성공 응답 대기)
+final_response 데이터 파싱
+    ↓
+setAppState('results') + 결과 데이터 표시
+```
+
+#### 🎨 **UI 업데이트 전략:**
+
+**현재 디자인 유지하면서 데이터만 채우기:**
+1. **통계 카드들**: 계산된 stats로 숫자 업데이트
+2. **대화 목록**: segments 데이터로 채우기
+3. **오류 하이라이트**: masked_text 기반으로 빨간색 처리
+4. **모달 내용**: 클릭한 세그먼트의 상세 정보 표시
+
+**로딩 상태 처리:**
+- STT 진행 중: 스피너 + "음성을 텍스트로 변환 중..."
+- LLM 진행 중: 스피너 + "AI가 발음을 분석 중..."
+- 완료: 결과 페이지 표시
+
+#### 📋 **구현 체크리스트:**
+
+**Phase 1: API 연동**
+- [ ] 화자 선택 후 STT API 호출
+- [ ] STT 완료 후 LLM API 호출  
+- [ ] 로딩 상태 관리 (processing 상태에서 메시지 변경)
+
+**Phase 2: 데이터 처리**
+- [ ] 화자 이름 매핑 로직 (session nickname ↔ selected speaker)
+- [ ] 통계 계산 함수
+- [ ] 데이터 정제 및 필터링
+
+**Phase 3: UI 업데이트**
+- [ ] 통계 카드 데이터 바인딩
+- [ ] 대화 목록 렌더링 
+- [ ] 오류 단어 하이라이트
+- [ ] 상세 피드백 모달 연동
+
+#### 🚨 **에러 처리 계획:**
+
+**API 오류 시:**
+- STT 실패: "음성 변환에 실패했습니다. 다시 시도해주세요."
+- LLM 실패: "분석에 실패했습니다. 다시 시도해주세요."  
+- 네트워크 오류: "네트워크 연결을 확인해주세요."
+
+**데이터 오류 시:**
+- 빈 응답: "분석 결과를 불러올 수 없습니다."
+- 형식 오류: "데이터 형식에 문제가 있습니다."
+
+#### 📈 **성능 최적화:**
+
+**대용량 세그먼트 처리:**
+- 세그먼트가 많을 경우 가상화(virtualization) 고려
+- 상세 모달은 필요시에만 데이터 로드
+- 오류가 있는 세그먼트만 먼저 표시하는 필터 옵션
+
+**메모리 관리:**
+- 큰 audio 파일들은 결과 페이지에서 해제
+- 이전 세션 데이터 정리
 
 ---
 
-## 🔄 플로우 상태 관리 및 API 연동
+## 🔄 업데이트된 전체 플로우 상태 관리 및 API 연동
 
 ### 현재 구현된 상태들:
 ```typescript
@@ -304,9 +443,12 @@ input → /api/session/init → session_id 획득
 processing → /api/diarization → speaker-selection
 
 speaker-selection → /api/speaker/preview → 화자 목록 표시
-                 → /api/speaker/select → results
+                 → /api/speaker/select → processing (STT/LLM)
 
-results → /api/inference → 분석 결과 표시
+processing (STT/LLM) → /api/inference/stt → STT 완료
+                    → /api/inference/llm → LLM 완료 → results
+
+results → 분석 결과 표시
         → "Start Over" → input (새 세션)
 ```
 
@@ -321,39 +463,52 @@ results → /api/inference → 분석 결과 표시
 | `/api/upload` | ✅ 완료 | JSON 객체 | 파일 업로드 및 변환 성공 |
 | `/api/diarization` | ✅ 완료 | JSON 객체 | 화자 분리 완료 메시지 |
 | `/api/speaker/select` | ✅ 완료 | JSON 객체 | 화자 선택 성공 |
+| `/api/inference/stt` | ✅ 완료 | JSON 객체 | STT 변환 완료 메시지 |
+| `/api/inference/llm` | ✅ 완료 | JSON 객체 | 상세 발음 분석 결과 반환 |
 
 ### ⚠️ 부분 구현된 API:
 | API | 상태 | 이슈 | 해결 방안 |
 |-----|------|------|--------|
 | `/api/speaker/preview` | ⚠️ 부분 | 음성 URL 접근 불가 | 백엔드 개발자와 URL prefix 확인 |
 
-### ❌ 미구현된 API:
-| API | 상태 | 현재 응답 | 예상 완료 |
+### ❌ 더 이상 사용하지 않는 API:
+| API | 상태 | 변경 사항 | 대체 API |
 |-----|------|-----------|----------|
-| `/api/inference` | ❌ 미완료 | `null` | 백엔드 개발 진행 중 |
+| `/api/inference` | ❌ 사용중지 | STT와 LLM으로 분리 | `/api/inference/stt` + `/api/inference/llm` |
 
 ---
 
 ## 🛠 개발 우선순위 및 개선 계획
 
-### **Phase 1: API 연동 완료** 🔄
+### **Phase 1: 마지막 페이지 구현** 🚀
 1. ✅ ~~세션 관리 API 연동~~
 2. ✅ ~~파일 업로드 API 연동~~
 3. ✅ ~~화자 분리 API 연동~~
-4. ⚠️ **화자 미리보기 음성 URL 수정** (백엔드 확인 필요)
-5. ❌ **음성 분석 결과 API 구현 대기** (`/api/inference`)
+4. ✅ ~~화자 선택 API 연동~~
+5. ✅ ~~STT 및 LLM API 연동 준비~~
+6. [ ] **STT → LLM 순차 호출 로직 구현**
+7. [ ] **화자 이름 매핑 로직 구현**
+8. [ ] **통계 계산 및 데이터 정제 구현**
+9. [ ] **결과 페이지 데이터 바인딩 구현**
 
-### **Phase 2: UX 개선**
-1. [ ] 실시간 API 상태 피드백
+### **Phase 2: 데이터 품질 개선**
+1. [ ] 빈 세그먼트 필터링
+2. [ ] ERROR 태그 처리
+3. [ ] [unk] 태그 정제
+4. [ ] 기본값 설정 로직
+5. ⚠️ **화자 미리보기 음성 URL 수정** (백엔드 확인 필요)
+
+### **Phase 3: UX 개선**
+1. [ ] 로딩 상태 메시지 세분화 (STT/LLM 구분)
 2. [ ] 오류 처리 및 재시도 로직
-3. [ ] 로딩 상태 개선 (진행률 표시)
-4. [ ] 네트워크 오류 처리
+3. [ ] 네트워크 오류 처리
+4. [ ] 상세 피드백 모달 UX 개선
 
-### **Phase 3: 고급 기능**
-1. [ ] 실시간 음성 분석
-2. [ ] 발음 점수 시각화
-3. [ ] 학습 히스토리 관리
-4. [ ] 세션 만료 처리
+### **Phase 4: 고급 기능**
+1. [ ] 발음 점수 시각화
+2. [ ] 학습 히스토리 관리
+3. [ ] 세션 만료 처리
+4. [ ] 오류 세그먼트 우선 표시 필터
 
 ---
 
@@ -414,14 +569,102 @@ const selectSpeaker = async (sessionId: string, speaker: string) => {
   return response.json(); // { message }
 };
 
-// 음성 분석 (구현 대기 중)
-const analyzeAudio = async (sessionId: string) => {
-  const response = await fetch('/api/inference', {
+// STT 음성 인식
+const performSTT = async (sessionId: string) => {
+  const response = await fetch('/api/inference/stt', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ session_id: sessionId })
   });
-  return response.json(); // 현재: null, 예상: 분석 결과 객체
+  return response.json(); // { message: "STT inference completed..." }
+};
+
+// LLM 발음 분석
+const performLLMAnalysis = async (sessionId: string) => {
+  const response = await fetch('/api/inference/llm', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId })
+  });
+  return response.json(); // { message, final_response: [...] }
+};
+
+// 전체 분석 플로우
+const runFullAnalysis = async (sessionId: string, selectedSpeaker: string, userNickname: string) => {
+  try {
+    // 1. STT 실행
+    const sttResult = await performSTT(sessionId);
+    console.log('STT 완료:', sttResult.message);
+    
+    // 2. LLM 실행
+    const llmResult = await performLLMAnalysis(sessionId);
+    
+    // 3. 데이터 정제 및 화자 매핑
+    const cleanedSegments = cleanSegmentData(llmResult.final_response);
+    const mappedSegments = mapSpeakerNames(cleanedSegments, selectedSpeaker, userNickname);
+    
+    return {
+      segments: mappedSegments,
+      stats: calculateStats(mappedSegments)
+    };
+  } catch (error) {
+    throw new Error(`분석 실패: ${error.message}`);
+  }
+};
+
+// 화자 이름 매핑 함수
+const mapSpeakerNames = (segments: Segment[], selectedSpeaker: string, userNickname: string) => {
+  const speakerMap = new Map();
+  let speakerCounter = 1;
+  
+  return segments.map(segment => {
+    let displayName = segment.speaker_name;
+    
+    if (segment.speaker_name === selectedSpeaker) {
+      // 선택한 화자는 사용자 이름으로 표시
+      displayName = userNickname;
+    } else {
+      // 다른 화자들은 "Speaker 1", "Speaker 2" 등으로 표시
+      if (!speakerMap.has(segment.speaker_name)) {
+        speakerMap.set(segment.speaker_name, `Speaker ${speakerCounter}`);
+        speakerCounter++;
+      }
+      displayName = speakerMap.get(segment.speaker_name);
+    }
+    
+    return {
+      ...segment,
+      display_name: displayName
+    };
+  });
+};
+
+// 오류 단어 추출 함수
+const extractErrorWords = (correctText: string, maskedText: string) => {
+  const correctWords = correctText.split(' ');
+  const maskedWords = maskedText.split(' ');
+  const errorWords = [];
+  
+  for (let i = 0; i < Math.min(correctWords.length, maskedWords.length); i++) {
+    if (maskedWords[i].includes('[w]')) {
+      errorWords.push({
+        index: i,
+        word: correctWords[i],
+        position: i
+      });
+    }
+  }
+  
+  return errorWords;
+};
+
+// 진행률 계산 함수
+const calculateProgress = (currentStep: 'stt' | 'llm') => {
+  const steps = {
+    stt: 50,   // STT 완료 시 50%
+    llm: 100   // LLM 완료 시 100%
+  };
+  return steps[currentStep];
 };
 ```
 
@@ -448,19 +691,36 @@ const handleApiError = (error: any) => {
    - **임시 해결**: 음성 재생 버튼 비활성화
    - **해결 방안**: 백엔드 개발자와 올바른 URL 형식 확인
 
-2. **음성 분석 결과 미구현**
-   - **문제**: `/api/inference`가 `null` 반환
-   - **임시 해결**: Mock 데이터로 결과 화면 표시
-   - **해결 방안**: 백엔드 구현 완료 대기
+### 🟡 데이터 품질 개선 필요:
+1. **LLM 응답 데이터 정제**
+   - 빈 필드들 (`""`) 처리
+   - `[ERROR]` 세그먼트 필터링
+   - `[unk]` 태그 제거
+   - 기본 메시지 설정
 
-### 🟡 개선 필요:
-1. **로딩 상태 관리**
-   - 각 API 호출별 적절한 로딩 메시지
-   - 진행률 표시 (가능한 경우)
+2. **화자 매핑 로직 구현**
+   - session nickname ↔ selected speaker 연결
+   - 다른 화자들을 "Speaker 1", "Speaker 2"로 표시
 
-2. **오류 복구**
-   - 네트워크 오류 시 재시도 로직
+3. **통계 계산 로직 구현**
+   - masked_text의 [w] 개수 기반 오류 계산
+   - 세그먼트 정확도 계산
+
+### 🟡 UX 개선 필요:
+1. **로딩 상태 세분화**
+   - STT 진행 중: "음성을 텍스트로 변환 중..."
+   - LLM 진행 중: "AI가 발음을 분석 중..."
+   - 진행률 표시 (50% → 100%)
+
+2. **오류 처리 강화**
+   - API 호출 실패 시 재시도 로직
+   - 네트워크 오류 대응
    - 사용자 친화적 오류 메시지
+
+3. **결과 페이지 최적화**
+   - 대화 내용 하이라이트 (오류 단어 빨간색)
+   - 상세 피드백 모달 연동
+   - 통계 카드 데이터 바인딩
 
 ---
 
@@ -481,4 +741,24 @@ const handleApiError = (error: any) => {
 
 **마지막 업데이트:** 2024-12-19  
 **작성자:** AI Assistant  
-**버전:** 2.0 (API 통합)
+**버전:** 3.0 (마지막 페이지 구현 계획 완료)
+
+## 📋 **구현 우선순위 요약**
+
+**🎯 즉시 구현 필요:**
+1. **STT → LLM 순차 호출** (화자 선택 후)
+2. **화자 이름 매핑** (선택된 speaker = 사용자 이름)
+3. **데이터 정제 및 필터링** (빈 값, ERROR, unk 태그)
+4. **통계 계산** (오류 개수, 정확도)
+5. **결과 페이지 데이터 바인딩** (디자인 유지하면서 내용만 채우기)
+
+**🔄 API 호출 순서:**
+```
+화자선택완료 → STT API → LLM API → 데이터처리 → 결과표시
+```
+
+**📊 핵심 로직:**
+- `session_id` 전체 플로우에서 유지
+- `nickname` (사용자 입력) = `selected_speaker` 이름으로 표시
+- `masked_text`의 `[w]` 개수로 오류 통계 계산
+- 빈 데이터 필터링 및 기본값 설정

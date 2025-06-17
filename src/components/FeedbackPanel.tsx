@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { X, Lightbulb, BookOpen, Target } from "lucide-react";
 import { createPortal } from "react-dom";
+import { LLMSegment } from "@/utils/api";
 
 interface Error {
   word: string;
@@ -12,6 +13,7 @@ interface TranscriptItem {
   speaker: string;
   text: string;
   errors: Error[];
+  originalSegment?: LLMSegment; // 실제 API 데이터가 있는 경우
 }
 
 interface FeedbackPanelProps {
@@ -20,64 +22,54 @@ interface FeedbackPanelProps {
 }
 
 const FeedbackPanel = ({ segment, onClose }: FeedbackPanelProps) => {
-  const getDetailedFeedback = (word: string) => {
-    const feedbackMap: { [key: string]: { ipa: string; tips: string[]; commonMistakes: string[] } } = {
-      '한국어를': {
-        ipa: '[han.ɡu.ɡʌ.ɾɯl]',
-        tips: [
-          'Emphasize the first syllable "han" clearly',
-          'The "ɡu" sound should be crisp, not soft',
-          'End with a clear "ɾɯl" with tongue tap'
-        ],
-        commonMistakes: [
-          'Pronouncing "국" as "gook" instead of "guk"',
-          'Missing the tongue tap in final "을"'
-        ]
-      },
-      '배우고': {
-        ipa: '[pɛ.u.ɡo]',
-        tips: [
-          'Start with clear "pɛ" sound (like "pay" but shorter)',
-          'Separate "u" vowel distinctly',
-          'End with soft "go" sound'
-        ],
-        commonMistakes: [
-          'Merging "배" and "우" sounds together',
-          'Pronouncing final "고" too harshly'
-        ]
-      },
-      '감사합니다': {
-        ipa: '[kam.sa.ham.ni.da]',
-        tips: [
-          'Each syllable should be equally stressed',
-          'Clear "m" consonant in "감" and "함"',
-          'Soft final "다" without strong "a" vowel'
-        ],
-        commonMistakes: [
-          'Rushing through middle syllables',
-          'Over-emphasizing final syllable'
-        ]
-      },
-      '조언해주셔서': {
-        ipa: '[t͡ʃo.ʌn.hɛ.d͡ʒu.ʃʌ.sʌ]',
-        tips: [
-          'Break into clear syllables: 조-언-해-주-셔-서',
-          'Soft "ʃʌ" sound in "셔", not hard "sher"',
-          'Maintain rhythm throughout the word'
-        ],
-        commonMistakes: [
-          'Blending syllables together',
-          'Incorrect "ʃ" sound pronunciation'
-        ]
-      }
-    };
+  // 실제 API 데이터가 있는지 확인 - 조건 완화
+  const hasRealData = segment.originalSegment && 
+                     (segment.originalSegment.improvement_tips &&
+                      segment.originalSegment.improvement_tips.trim() !== "" &&
+                      segment.originalSegment.improvement_tips !== "Tips are being prepared for you.") ||
+                     (segment.originalSegment.masked_text && 
+                      segment.originalSegment.masked_text.includes('[w]'));
 
-    return feedbackMap[word] || {
-      ipa: `[${word}]`,
-      tips: ['Practice this word slowly and clearly'],
-      commonMistakes: ['Focus on clear articulation']
-    };
+  // API 데이터에서 팁을 배열로 파싱하는 함수
+  const parseApiTips = (tipsString: string): string[] => {
+    if (!tipsString || tipsString.trim() === "") return [];
+    
+    // 큰따옴표로 감싸진 팁들을 추출
+    const matches = tipsString.match(/"([^"]+)"/g);
+    if (matches) {
+      return matches.map(match => match.replace(/"/g, ''));
+    }
+    
+    // 큰따옴표가 없으면 콤마로 분할
+    return tipsString.split(',').map(tip => tip.trim()).filter(tip => tip.length > 0);
   };
+
+  // 에러 분석 함수 - 실제 API 데이터만 사용
+  const analyzeSegmentErrors = () => {
+    if (hasRealData && segment.originalSegment) {
+      const apiSegment = segment.originalSegment;
+      
+      // 실제 API 데이터만 사용
+      return [{
+        word: segment.text, // 전체 텍스트
+        ipa: apiSegment.correct_ipa || '',
+        tips: parseApiTips(apiSegment.improvement_tips),
+        commonMistakes: parseApiTips(apiSegment.common_mistakes),
+        focusAreas: parseApiTips(apiSegment.focus_areas),
+        practiceTips: parseApiTips(apiSegment.practice_tips)
+      }];
+    } else {
+      // API 데이터가 없으면 빈 배열 반환
+      return [];
+    }
+  };
+
+  const errorAnalysis = analyzeSegmentErrors();
+
+  // API 데이터가 없으면 패널을 표시하지 않음
+  if (!hasRealData || errorAnalysis.length === 0) {
+    return null;
+  }
 
   return createPortal(
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
@@ -110,34 +102,18 @@ const FeedbackPanel = ({ segment, onClose }: FeedbackPanelProps) => {
         {/* Scrollable Content */}
         <div className="overflow-y-auto scrollbar-hide p-6 pb-8 space-y-8" style={{ maxHeight: 'calc(90vh - 140px)' }}>
           {/* Error Analysis */}
-          {segment.errors?.map((error, index) => {
-            const feedback = getDetailedFeedback(error.word);
-            
-            return (
-              <div key={index} className="premium-card p-6 space-y-6">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-                    <span className="text-red-800 font-semibold text-sm">{index + 1}</span>
-                  </div>
-                  <div>
-                    <h4 className="text-body font-semibold text-gray-900">
-                      "{error.word}"
-                    </h4>
-                    <p className="text-caption text-gray-600 font-mono">
-                      IPA: {feedback.ipa}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-6">
-                  {/* Improvement Tips */}
-                  <div>
-                    <h5 className="text-body font-medium text-gray-900 mb-4 flex items-center">
-                      <Lightbulb className="w-4 h-4 mr-2 text-yellow-600" />
-                      Improvement Tips
-                    </h5>
+          {errorAnalysis.map((analysis, index) => (
+            <div key={index} className="premium-card p-6 space-y-6">
+              <div className="grid md:grid-cols-2 gap-6">
+                {/* Improvement Tips */}
+                <div>
+                  <h5 className="text-body font-medium text-gray-900 mb-4 flex items-center">
+                    <Lightbulb className="w-4 h-4 mr-2 text-yellow-600" />
+                    Improvement Tips
+                  </h5>
+                  {analysis.tips && analysis.tips.length > 0 ? (
                     <ul className="space-y-3">
-                      {feedback.tips.map((tip, tipIndex) => (
+                      {analysis.tips.map((tip, tipIndex) => (
                         <li key={tipIndex} className="flex items-start space-x-3">
                           <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                             <span className="text-blue-600 text-xs font-medium">{tipIndex + 1}</span>
@@ -146,72 +122,78 @@ const FeedbackPanel = ({ segment, onClose }: FeedbackPanelProps) => {
                         </li>
                       ))}
                     </ul>
-                  </div>
+                  ) : (
+                    <p className="text-body text-gray-600 italic">Tips are being prepared for you.</p>
+                  )}
+                </div>
 
-                  {/* Common Mistakes */}
-                  <div>
-                    <h5 className="text-body font-medium text-gray-900 mb-4 flex items-center">
-                      <Target className="w-4 h-4 mr-2 text-red-600" />
-                      Common Mistakes
-                    </h5>
+                {/* Common Mistakes */}
+                <div>
+                  <h5 className="text-body font-medium text-gray-900 mb-4 flex items-center">
+                    <Target className="w-4 h-4 mr-2 text-red-600" />
+                    Common Mistakes
+                  </h5>
+                  {analysis.commonMistakes && analysis.commonMistakes.length > 0 ? (
                     <ul className="space-y-3">
-                      {feedback.commonMistakes.map((mistake, mistakeIndex) => (
+                      {analysis.commonMistakes.map((mistake, mistakeIndex) => (
                         <li key={mistakeIndex} className="flex items-start space-x-3">
                           <div className="w-1.5 h-1.5 bg-red-500 rounded-full mt-2.5 flex-shrink-0"></div>
                           <span className="text-body text-gray-900">{mistake}</span>
                         </li>
                       ))}
                     </ul>
+                  ) : (
+                    <p className="text-body text-gray-600 italic">Common mistakes analysis is being prepared.</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Overall Pronunciation Guidance */}
+              <div className="bg-blue-50 rounded-lg p-5 border border-blue-200">
+                <h5 className="text-body font-medium text-blue-800 mb-4 flex items-center">
+                  <BookOpen className="w-4 h-4 mr-2" />
+                  Overall Pronunciation Guidance
+                </h5>
+                <div className="grid md:grid-cols-2 gap-4 text-body">
+                  <div>
+                    <h6 className="font-medium text-blue-800 mb-2">Focus Areas:</h6>
+                    {analysis.focusAreas && analysis.focusAreas.length > 0 ? (
+                      <ul className="space-y-1 text-blue-700">
+                        {analysis.focusAreas.map((area, areaIndex) => (
+                          <li key={areaIndex}>• {area}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-blue-700 italic">Focus areas are being prepared.</p>
+                    )}
+                  </div>
+                  <div>
+                    <h6 className="font-medium text-blue-800 mb-2">Practice Tips:</h6>
+                    {analysis.practiceTips && analysis.practiceTips.length > 0 ? (
+                      <ul className="space-y-1 text-blue-700">
+                        {analysis.practiceTips.map((tip, tipIndex) => (
+                          <li key={tipIndex}>• {tip}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-blue-700 italic">Practice tips are being prepared.</p>
+                    )}
                   </div>
                 </div>
-
-                {/* Practice Section */}
-                <div className="bg-blue-50 rounded-lg p-5 border border-blue-200">
-                  <h5 className="text-body font-medium text-blue-800 mb-3 flex items-center">
-                    <BookOpen className="w-4 h-4 mr-2" />
-                    Practice Exercise
-                  </h5>
-                  <p className="text-body text-blue-700 mb-4">
-                    Repeat this word 5 times slowly, focusing on the IPA pronunciation guide. 
-                    Record yourself to compare with the correct pronunciation.
-                  </p>
-                  <div className="bg-white rounded-lg p-4 border border-blue-200">
-                    <div className="flex items-center justify-center">
-                      <div className="text-center">
-                        <span className="text-subtitle font-semibold text-gray-900">{error.word}</span>
-                        <p className="text-caption text-gray-600 font-mono mt-1">{feedback.ipa}</p>
-                      </div>
+                
+                <div className="bg-white rounded-lg p-4 border border-blue-200 mt-4">
+                  <div className="flex items-center justify-center">
+                    <div className="text-center">
+                      <span className="text-subtitle font-semibold text-gray-900">{analysis.word}</span>
+                      {analysis.ipa && (
+                        <p className="text-caption text-gray-600 font-mono mt-1">{analysis.ipa}</p>
+                      )}
                     </div>
                   </div>
                 </div>
               </div>
-            );
-          })}
-
-          {/* Overall Guidance */}
-          <div className="premium-card p-6 bg-gray-50">
-            <h5 className="text-body font-medium text-gray-900 mb-4">
-              Overall Pronunciation Guidance
-            </h5>
-            <div className="grid md:grid-cols-2 gap-4 text-body">
-              <div>
-                <h6 className="font-medium text-gray-900 mb-2">Focus Areas:</h6>
-                <ul className="space-y-1 text-gray-700">
-                  <li>• Clear syllable separation</li>
-                  <li>• Consistent rhythm and timing</li>
-                  <li>• Accurate vowel pronunciation</li>
-                </ul>
-              </div>
-              <div>
-                <h6 className="font-medium text-gray-900 mb-2">Practice Tips:</h6>
-                <ul className="space-y-1 text-gray-700">
-                  <li>• Practice with native audio</li>
-                  <li>• Record yourself regularly</li>
-                  <li>• Focus on one error at a time</li>
-                </ul>
-              </div>
             </div>
-          </div>
+          ))}
         </div>
       </div>
     </div>,

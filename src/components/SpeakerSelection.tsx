@@ -218,7 +218,7 @@ const SpeakerSelection = ({ audioData, userName, participantCount, sessionId, on
         const apiSpeakers: Speaker[] = response.previews.map((preview, index) => ({
           id: preview.speaker,
           name: `Speaker ${index + 1}`,
-          duration: '측정 중...', // 초기값
+          duration: 'Measuring...', // 초기값
           // 개발 환경에서는 프록시 경로 사용, 프로덕션에서는 전체 URL 사용
           audioUrl: isDev ? preview.url : `${apiBaseUrl}${preview.url}`,
           isLoadingDuration: true
@@ -446,7 +446,7 @@ const SpeakerSelection = ({ audioData, userName, participantCount, sessionId, on
                             {speaker.isLoadingDuration ? (
                               <span className="duration-loading ml-1">
                                 <div className="duration-spinner"></div>
-                                측정 중...
+                                Measuring...
                               </span>
                             ) : speaker.duration === '알 수 없음' ? (
                               <span className="duration-error ml-1">
